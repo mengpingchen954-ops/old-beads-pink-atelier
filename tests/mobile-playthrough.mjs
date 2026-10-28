@@ -47,7 +47,7 @@ for(const engine of [chromium,webkit]){
    // A valid late-game save exercises all four material rows and filled gallery cells.
    await page.evaluate(save=>localStorage.setItem('old-beads-pink-v1',JSON.stringify(save)),{version:1,completed:Array.from({length:11},(_,i)=>i),coins:1000,sound:true,session:{level:11,state:createState(levels[11]),history:[],usedHint:false}});
    await page.reload();await tap('#collection-home');await fits();await page.screenshot({path:`artifacts/mobile-collection-${tag}.png`,fullPage:true});await tap('#modal .modal-close');
-   await tap('#start-btn');assert.equal((await read()).level,12);await targets();await fits();await page.screenshot({path:`artifacts/mobile-four-rails-${tag}.png`,fullPage:true});
+   await tap('#start-btn');await page.locator('[data-source="rail-0"]').waitFor();assert.equal((await read()).level,12);await targets();await fits();await page.evaluate(()=>Promise.all([...document.images].map(img=>img.decode())));await page.screenshot({path:`artifacts/mobile-four-rails-${tag}.png`,fullPage:true});
    const action=solve((await read()).state,levels[11])[0];await tap(`[data-source="${action.source.type}-${action.source.index}"]`);await tap(`[data-target="${action.target.type}-${action.target.index}"]`);assert.equal((await read()).state.moves,1);
    await page.setViewportSize({width:height,height:width});await page.waitForTimeout(100);assert.equal((await read()).state.moves,1);await fits();
    await page.reload();await tap('#start-btn');assert.equal((await read()).state.moves,1,`${tag}: progress survives rotation and reload`);
