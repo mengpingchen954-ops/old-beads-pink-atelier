@@ -5,14 +5,14 @@ import {flightPoint,launchPoint,rebound} from './feedback.js';
 import {accentSlot,braceletLayout,BRACELET_SITES,BRACELET_RADIUS,BRACELET_BEAD_SIZE} from './jewelry.js';
 export let W=1000,H=800;
 let compact=false;
-export const railPos=(i,j=0)=>({x:(compact?140:155)+j*(compact?93:108),y:(compact?490:535)+i*(compact?84:60)});
-export const bufferPos=(i,capacity)=>({x:compact?(capacity===3?200+i*100:250+i*110):725+i*83,y:compact?865:630});
+export const railPos=(i,j=0)=>({x:(compact?140:155)+j*(compact?93:108),y:(compact?490:535)+i*(compact?100:64)});
+export const bufferPos=(i,capacity)=>({x:compact?(capacity===3?200+i*100:250+i*110):725+i*83,y:compact?910:630});
 export const orderPos=i=>({x:compact?180+i*300:275+i*450,y:compact?220:245});
 export const braceletScale=()=>compact?1.375:1.75;
 export const playBeadSize=()=>BRACELET_BEAD_SIZE*braceletScale();
 export const orderHitSize=()=>compact?290:370;
 export const railBeadSize=()=>compact?78:68;
-export const railHitHeight=()=>compact?82:60;
+export const railHitHeight=()=>compact?98:64;
 export function beadPos(i,j,count){const p=orderPos(i),a=-Math.PI/2+accentSlot(j,count)/BRACELET_SITES*Math.PI*2;return {x:p.x+Math.cos(a)*BRACELET_RADIUS*braceletScale(),y:p.y+Math.sin(a)*BRACELET_RADIUS*braceletScale()};}
 export function sourcePos(source,capacity){return source.type==='rail'?railPos(source.index):bufferPos(source.index,capacity);}
 export function designPos(i){const a=-Math.PI/2+i*Math.PI/6,r=compact?177:190;return {x:W/2+Math.cos(a)*r,y:(compact?278:305)+Math.sin(a)*r};}
@@ -24,13 +24,14 @@ export class Board {
     this.renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'low-power'});this.renderer.setClearColor('#fae4df');this.renderer.setPixelRatio(Math.min(devicePixelRatio,2));
     this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.domElement.setAttribute('aria-hidden','true');host.prepend(this.renderer.domElement);
     this.group=new THREE.Group();this.fx=new THREE.Group();this.scene.add(this.group,this.fx);this.effects=[];this.beads=new Map();this.rims=new Map();this.textures={};this.geometry=new THREE.PlaneGeometry(1,1);this.reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
-    this.resizeObserver=new ResizeObserver(()=>this.resize());this.resizeObserver.observe(host);this.resize();
+    // Aspect-ratio changes during rotation must settle outside the observer's layout pass.
+    this.resizeObserver=new ResizeObserver(()=>{cancelAnimationFrame(this.resizeFrame);this.resizeFrame=requestAnimationFrame(()=>{if(this.host.isConnected)this.resize();});});this.resizeObserver.observe(host);this.resize();
     this.renderer.domElement.addEventListener('webglcontextlost',e=>{e.preventDefault();this.cancelFeedback();this.host.dispatchEvent(new Event('board-lost'));});
     this.renderer.domElement.addEventListener('webglcontextrestored',()=>{if(this.designView)this.drawDesign(this.designView);else if(this.last)this.draw(...this.last);this.host.dispatchEvent(new Event('board-restored'));});
   }
   mount(host){this.cancelFeedback();this.resizeObserver.disconnect();this.host=host;host.prepend(this.renderer.domElement);this.resizeObserver.observe(host);this.resize();}
   async load(){const loader=new THREE.TextureLoader();await Promise.all(['workbench','well','roses',...COLORS.map(c=>c.file)].map(async name=>{const t=await loader.loadAsync(art(name));t.colorSpace=THREE.SRGBColorSpace;this.textures[name]=t;}));}
-  resize(){const next=innerWidth<=600,changed=next!==compact;if(changed)this.cancelFeedback();compact=next;W=compact?660:1000;H=compact?(this.designView?740:1000):(this.designView?700:800);this.host.style.aspectRatio=`${W}/${H}`;this.camera.right=W;this.camera.bottom=H;this.camera.updateProjectionMatrix();const r=this.host.getBoundingClientRect();this.renderer.setSize(r.width,r.height,false);if(changed&&(this.last||this.designView)){if(this.designView)this.drawDesign(this.designView);else this.draw(...this.last);this.host.dispatchEvent(new Event('board-layout'));}else this.render();}
+  resize(){const next=innerWidth<=760,changed=next!==compact;if(changed)this.cancelFeedback();compact=next;W=compact?660:1000;H=compact?(this.designView?740:1000):(this.designView?700:800);this.host.style.aspectRatio=`${W}/${H}`;this.camera.right=W;this.camera.bottom=H;this.camera.updateProjectionMatrix();const r=this.host.getBoundingClientRect();this.renderer.setSize(r.width,r.height,false);if(changed&&(this.last||this.designView)){if(this.designView)this.drawDesign(this.designView);else this.draw(...this.last);this.host.dispatchEvent(new Event('board-layout'));}else this.render();}
   clear(){for(const o of [...this.group.children]){this.group.remove(o);if(o.geometry!==this.geometry)o.geometry?.dispose();if(o.material?.map?.userData?.temporary)o.material.map.dispose();o.material?.dispose();}}
   plane(x,y,w,h,material,z=0){material.side=THREE.DoubleSide;const mesh=new THREE.Mesh(this.geometry,material);mesh.position.set(x,y,z);mesh.scale.set(w,-h,1);this.group.add(mesh);return mesh;}
   rect(x,y,w,h,color,z=0,opacity=1){return this.plane(x,y,w,h,new THREE.MeshBasicMaterial({color,transparent:true,opacity,depthWrite:false}),z);}
@@ -61,9 +62,9 @@ export class Board {
       rail.forEach((c,j)=>this.bead(`rail-${i}-${j}`,c,railPos(i,j),railBeadSize()));
       if(rail.length){this.text('‹',p.x-50,p.y,26,'#aa6b81');if(selected?.type==='rail'&&selected.index===i)this.ring(p.x,p.y,railBeadSize()*.48,'#86a592',3);}
     });
-    if(compact)this.text('暂 存 木 盘',330,805,18,'#9c5e77');
+    if(compact)this.text('暂 存 木 盘',330,850,18,'#9c5e77');
     state.buffer.forEach((c,i)=>{const p=bufferPos(i,level.capacity);this.image('well',p.x,p.y,90,90,0);this.rims.set(`buffer-${i}`,this.ring(p.x,p.y,32,'#b7a482',1,.12));if(c!==null)this.bead(`buffer-${i}`,c,p,83);else this.text('＋',p.x,p.y,22,'#c4a294');if(selected?.type==='buffer'&&selected.index===i)this.ring(p.x,p.y,43,'#86a592',3);});
-    this.text(`${state.buffer.filter(c=>c!==null).length} / ${level.capacity} 格占用`,compact?330:805,compact?920:710,13,'#a0867b');
+    this.text(`${state.buffer.filter(c=>c!==null).length} / ${level.capacity} 格占用`,compact?330:805,compact?970:710,13,'#a0867b');
     this.rect(W/2,compact?410:472,compact?540:820,1,'#d8b7a7',-1,.6);
     state.orders.forEach((done,i)=>{
       const p=orderPos(i),goal=level.orders[i],scale=braceletScale(),radius=BRACELET_RADIUS*scale,mat=radius+32;

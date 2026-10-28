@@ -21,3 +21,47 @@ body{background:radial-gradient(ellipse at 50% 20%,#fff5eb,#f6d7df 90%);color:va
 #volume-slider,#music-volume-slider{width:100%;min-height:35px;margin-bottom:14px;accent-color:#bc7c9b}#music-toggle,#sound-toggle{width:22px;height:22px;flex-shrink:0;accent-color:#bc7c9b}
 
 .music-picker{border-top:1px dashed #dfb9b5;border-bottom:1px dashed #dfb9b5;padding:14px 0;margin:0 0 6px}.music-picker-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px;color:#a1778d;margin-bottom:10px}.music-picker-heading output{font-size:11px;color:#95617a}.music-track-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.music-track-list button{min-height:42px;border:1px solid #d7a7ad;border-radius:11px;padding:8px 10px;background:#fff6e8;color:#9b6a80;font-size:12px;display:flex;gap:8px;align-items:center}.music-track-list button[aria-pressed=true]{background:#edbdcc;border-color:#b97996;color:#844566;box-shadow:inset 0 0 0 1px #f9dee1}.music-track-list button:focus-visible{outline:2px solid #a15f80;outline-offset:2px}.music-picker>small{display:block;font-size:10px;margin-top:10px;color:#9c8287}@media(max-width:760px){.music-track-list{grid-template-columns:repeat(2,minmax(0,1fr))}.music-picker-heading{font-size:11px}.music-picker-heading output{font-size:10px}}
+
+/* Keep touch controls reachable without shrinking the bracelets or bead targets. */
+@media(max-width:760px){
+ .village-home{padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left)}
+ .village-top{padding:12px 4%}.wordmark b{font-size:22px;letter-spacing:3px}.village-wallet{gap:6px}.village-wallet>span{padding:6px;gap:3px}
+ .area-switcher{margin-top:2px}.area-switcher button{padding:7px 10px;min-height:44px}
+ .village-stage{display:grid;grid-template-rows:auto minmax(0,1fr) auto;min-height:0;padding-top:0}
+ .task-note{position:relative;left:auto;top:auto;width:92%;margin:14px 4% 0;padding:10px 12px;transform:none;display:grid;grid-template-columns:minmax(0,1fr) 94px;column-gap:10px}
+ .task-note .eyebrow,.task-note h1,.task-note p{grid-column:1}.task-note h1{font-size:17px}.task-note p{max-width:none;font-size:10px}
+ .task-note .secondary{position:static;grid-column:2;grid-row:1/4;align-self:center;width:100%;margin:0;min-height:48px;font-size:10px}
+ .world-frame,.village-home[data-scene=shop] .world-frame{grid-row:2;justify-self:center;width:min(125%,calc((100svh - 350px)*1.5));min-width:100%;margin:0}
+ .village-stage .world-art{min-height:0;max-height:none}
+ .village-play,.village-home[data-scene=shop] .village-play{position:relative;grid-row:3;justify-self:end;right:auto;bottom:auto;width:70%;min-width:0;margin:8px 4% 12px 0;min-height:60px;padding:10px 16px!important;font-size:18px!important}
+ .village-play small{margin-top:5px;font-size:9px}.village-play b{font-size:26px}
+ .village-bottom{padding:8px 4% max(14px,env(safe-area-inset-bottom))}.village-bottom nav{gap:5px}.village-bottom nav button{flex:1;min-width:0;height:60px;font-size:23px}
+ .village-bottom nav small{white-space:nowrap;letter-spacing:0;font-size:9px}.village-bottom>.text-button{bottom:100px;min-height:44px}
+ .village-custom{bottom:86px;width:84px}.village-custom .design-bracelet{width:70px}
+ .icon-button,.atelier-top .icon-button,.petal-modal .modal-close{width:44px;height:44px;min-width:44px;min-height:44px}
+ .game-shell.atelier-game{padding:max(10px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left))}
+ .atelier-top{grid-template-columns:44px minmax(0,1fr) 94px;gap:8px}.atelier-top .top-tools{gap:6px}.level-scroll h1{font-size:14px}.level-scroll small{font-size:8px}
+ .atelier-game .story-sidebar{grid-template-columns:40px minmax(0,1fr) 64px;gap:8px;padding:6px 10px;margin-top:4px}
+ .atelier-game .portrait-wrap{width:40px;height:44px}.atelier-game .client-name{grid-row:1/3;font-size:12px;flex-wrap:wrap;gap:4px}.atelier-game .client-note{display:none}
+ .atelier-game .sidebar-link{min-height:44px;display:flex;align-items:center;justify-content:center;font-size:10px}.atelier-game .instruction{min-height:30px}
+ .atelier-game .board-hit{min-width:44px;min-height:44px}.sound-settings{min-height:44px;margin-left:2px;font-size:11px}
+ .design-shell{padding:max(10px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left))}
+ .design-header button,.jewelry-filters button,.design-letter>summary{min-height:44px}.design-letter>summary{align-items:center}
+ .design-actions>div{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;width:100%}.design-actions .tool{min-height:44px;justify-content:center;padding:8px}
+ .design-actions [hidden]{display:none}.design-actions .primary{width:100%;min-height:48px}.jewelry-library .design-materials{grid-template-columns:repeat(5,minmax(0,1fr))}
+ body:has(#modal){overflow:hidden}.petal-modal{padding:max(8px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left));overscroll-behavior:contain}
+ .petal-modal .modal{max-height:calc(100dvh - max(8px,env(safe-area-inset-top)) - max(8px,env(safe-area-inset-bottom)));overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:26px 18px 22px}
+ .petal-modal .modal-actions button{min-height:44px}.petal-modal .reward-bracelets{gap:12px;padding:12px 4px}.reward-bracelets .bracelet{width:calc((100% - 12px)/2);height:auto;aspect-ratio:1}.reward-bracelets .bracelet>img{width:26%;height:26%}
+ .petal-modal .modal-close{top:6px;right:6px}.petal-modal .gallery-item{min-width:0;padding:8px 4px}.gallery-item .bracelet{width:min(100%,120px);height:auto;aspect-ratio:1}.gallery-item .bracelet img{width:26%;height:26%}
+ .audio-modal>p:first-of-type{display:none}.audio-modal h2{margin:4px 0 8px}.audio-modal .audio-control{min-height:44px;padding:8px 0;font-size:13px}.audio-modal .audio-control small{font-size:10px;margin-top:4px}
+ .audio-modal #volume-slider,.audio-modal #music-volume-slider{min-height:44px;margin:0 0 4px}.audio-modal #music-toggle,.audio-modal #sound-toggle{width:28px;height:28px}
+ .audio-modal .music-picker{padding:10px 0}.audio-modal .music-track-list{gap:6px}.audio-modal .music-track-list button{min-height:44px;padding:8px;font-size:11px}
+ .audio-modal .music-picker-heading{flex-wrap:wrap}.audio-modal p.muted{margin:10px 0;font-size:10px}.audio-modal .modal-actions{margin-top:12px}
+ #toast{bottom:max(18px,env(safe-area-inset-bottom))}
+}
+@media(min-width:761px) and (max-width:1024px){
+ .game-shell.atelier-game{padding:12px max(12px,env(safe-area-inset-right)) 20px max(12px,env(safe-area-inset-left))}
+ .atelier-layout{grid-template-columns:minmax(0,1fr);max-width:700px;gap:8px}.atelier-game .story-sidebar{margin:0;padding:8px 12px;transform:none;flex-direction:row;align-items:center;gap:12px}
+ .atelier-game .portrait-wrap,.atelier-game .client-note,.atelier-game .sidebar-bottom,.atelier-game .letter-pin{display:none}.atelier-game .client-name{font-size:14px}.atelier-game .sidebar-link{margin-left:auto;min-height:44px}
+ .atelier-game .board-wrap{width:100%}.atelier-game .board-hit{min-width:44px;min-height:44px}.sound-settings{min-height:44px}.atelier-top .icon-button{width:44px;height:44px}.petal-modal .modal{max-height:calc(100dvh - 24px);overscroll-behavior:contain}
+}

@@ -32,7 +32,7 @@ try{
   const sameTrackTime=(await read()).audio.time;await click('[data-music-track="0"]');assert.ok((await read()).audio.time>=sameTrackTime);
   assert.equal(await page.evaluate(()=>__musicPlayers.length),1);
   await page.locator('#music-volume-slider').evaluate(el=>{el.value='25';el.dispatchEvent(new Event('input',{bubbles:true}));});
-  assert.equal((await read()).audio.musicVolume,.25);assert.ok(Math.abs(await page.evaluate(()=>__musicPlayers[0].volume)-.175)<.001);
+  assert.equal((await read()).audio.musicVolume,.25);await page.waitForFunction(()=>Math.abs(JSON.parse(render_game_to_text()).audio.musicLevel-.175)<.001);
   await page.locator('#music-toggle').uncheck();assert.equal((await read()).audio.playing,false);
   const pausedAt=(await read()).audio.time;await page.waitForTimeout(180);assert.equal((await read()).audio.time,pausedAt);
   await click('[data-music-track="4"]');assert.equal((await read()).audio.playing,false);assert.equal((await read()).audio.track,MUSIC_TRACKS[4].title);

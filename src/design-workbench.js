@@ -15,7 +15,7 @@ export async function mountDesigner(ctx){
  <section class="design-work"><div class="design-step"><b>① 选珠　② 弹射　③ 拖动换位</b><span id="design-count"></span></div><div id="board" class="board-wrap design-board"><div id="design-hit-layer" class="hit-layer" aria-label="弹射与串珠工作台"></div></div><div id="design-status" class="design-status" role="status">选一颗珠宝，点击粉色发射座。落珠后可以直接拖动换位。</div>
  <section class="jewelry-library" aria-label="珠宝材料库"><div class="jewelry-library-head"><b>珠宝盒 <span>24 种</span></b><small>滑动查看更多</small></div><div class="jewelry-filters" aria-label="材料分类">${[['all','全部'],['crystal','水晶'],['natural','天然材质'],['gem','切面宝石'],['charm','造型配饰']].map(([id,name])=>`<button data-filter="${id}" aria-pressed="${id==='all'}">${name}</button>`).join('')}</div><div class="design-materials">${MATERIALS.map(m=>`<button data-material="${m.color}" aria-pressed="false"><img src="${art(COLORS[m.color].file)}" alt="" loading="eager"><b>${COLORS[m.color].name}</b><span data-stock="${m.color}"></span></button>`).join('')}</div></section>
  <footer class="design-actions"><div><button class="tool" id="design-resume" hidden>继续上次搭配</button><button class="tool" id="design-undo">↶ 撤销</button><button class="tool" id="design-move" aria-pressed="false">换位</button><button class="tool" data-material="remove" aria-pressed="false">取下</button><button class="tool" id="design-reset">重来</button><button class="tool" id="design-sound" aria-label="切换声音">声音</button></div><button class="primary" id="design-submit">欣赏并交付 ✦</button></footer></section></section></main>`;
- $('.design-letter').open=innerWidth>600;
+ scrollTo(0,0);$('.design-letter').open=innerWidth>760;
  $('#design-home').onclick=ctx.home;$('#design-showcase').onclick=()=>{cancel();showroom(ctx);};$('#design-sound').onclick=()=>{ctx.toggleSound();$('#design-sound').setAttribute('aria-pressed',String(progress.sound));};
  const board=await ctx.ensureBoard();if(!ctx.active()){listeners.abort();return null;}
  // Ignore the synthetic tap after a drag while preserving new gestures and keyboard clicks.
@@ -91,18 +91,19 @@ export async function mountDesigner(ctx){
   board.cancelFeedback();const result=finishDesign({...progress.workshop,draft},progress.coins);Object.assign(progress,{workshop:result.workshop,coins:result.coins});save();refresh();tone('win');tone('coin');
   openModal(`<div class="eyebrow">特别委托完成 · 这是你的搭配</div><h2>旧珠还在，海也回来了。</h2><div class="showcase-tray tray-${progress.workshop.tray}">${designBracelet(progress.workshop.design,art)}</div><div class="coin-settlement"><span class="coin-medallion">✦</span><strong>${result.reward?'+240':'作品已更新'}</strong><small>${result.reward?'首次交付金币':'首次奖励已领取，重新搭配不重复发币'}</small><div class="coin-total">累计金币 <b>${progress.coins}</b></div></div><p>“熟悉的旧珠还在，新的颜色也有了自己的位置。” — 林女士</p><div class="modal-actions"><button class="secondary" data-close>再欣赏一会</button><button class="primary" id="design-display">放进我的橱窗</button></div>`,true);$('#design-display').onclick=()=>showroom(ctx);
  };
- $('#board').addEventListener('board-layout',()=>{cancel();$('.design-letter').open=innerWidth>600;refresh();});
+ $('#board').addEventListener('board-layout',()=>{cancel();scrollTo(0,0);$('.design-letter').open=innerWidth>760;refresh();});
  $('#board').addEventListener('board-restored',()=>{refresh();toast('工作台已恢复，你的搭配还在。');});
  // Complete touch taps on pointerup, including the first tap after a cancelled drag.
  let buttonTouch=null,lastTouchButton=null,lastTouchTime=0;
- app.addEventListener('pointerdown',e=>{const b=e.target.closest('button');if(e.pointerType==='touch'&&e.isPrimary&&b&&!b.dataset.slot){buttonTouch={button:b,id:e.pointerId,x:e.clientX,y:e.clientY};lastTouchButton=null;}},{signal:listeners.signal});
+ app.addEventListener('pointerdown',e=>{lastTouchButton=null;const b=e.target.closest('button');if(e.pointerType==='touch'&&e.isPrimary&&b&&!b.dataset.slot){buttonTouch={button:b,id:e.pointerId,x:e.clientX,y:e.clientY};}},{signal:listeners.signal});
  app.addEventListener('pointerup',e=>{
   const p=buttonTouch;if(!p||p.id!==e.pointerId)return;buttonTouch=null;
   if(p.button!==e.target.closest('button')||p.button.disabled||Math.hypot(e.clientX-p.x,e.clientY-p.y)>8||!interactive())return;
   lastTouchButton=p.button;lastTouchTime=performance.now();p.button.click();e.preventDefault();
  },{signal:listeners.signal});
  app.addEventListener('pointercancel',()=>buttonTouch=null,{signal:listeners.signal});
- app.addEventListener('click',e=>{if(e.isTrusted&&e.detail>0&&e.target.closest('button')===lastTouchButton&&performance.now()-lastTouchTime<500){e.preventDefault();e.stopImmediatePropagation();}},{capture:true,signal:listeners.signal});
+ // Filtering can move a different button under the finger before the native click arrives.
+ app.addEventListener('click',e=>{if(e.isTrusted&&e.detail>0&&lastTouchButton&&performance.now()-lastTouchTime<500){e.preventDefault();e.stopImmediatePropagation();}},{capture:true,signal:listeners.signal});
  document.addEventListener('visibilitychange',()=>{if(document.hidden)cancel();},{signal:listeners.signal});window.addEventListener('blur',cancel,{signal:listeners.signal});
  refresh();return {undo,refresh,cancel,dispose:()=>{cancel();listeners.abort();},text:()=>({slots:draft,hasSavedDraft:!!resumable,selectedColor,selectedSlot,moveMode,movingFrom,filter,launcher:launcherPos(),materials:MATERIALS.map(m=>({...m,name:COLORS[m.color].name,remaining:remaining(draft,m.color)})),checks:designChecks(draft),targets:draft.map((_,i)=>designPos(i)),savedDesign:progress.workshop.design,tray:progress.workshop.tray,rewarded:progress.workshop.rewarded})};
 }

@@ -127,7 +127,15 @@ export class AtelierAudio {
       this.player.onended=()=>{this.failures=0;this.nextMusic();};
       this.player.onerror=()=>{if(++this.failures<MUSIC_TRACKS.length)this.nextMusic();};
     }
-    this.player.volume=Math.max(0,Math.min(1,(this.prefs.volume??.7)*(this.prefs.musicVolume??.35)));
+    const level=Math.max(0,Math.min(1,(this.prefs.volume??.7)*(this.prefs.musicVolume??.35)));
+    // iPhone ignores media-element volume; use the same unlocked Web Audio context.
+    if(this.ctx?.createMediaElementSource&&!this.musicGain){
+      this.musicSource=this.ctx.createMediaElementSource(this.player);this.musicGain=this.ctx.createGain();
+      this.musicGain.gain.value=level;this.musicSource.connect(this.musicGain);this.musicGain.connect(this.ctx.destination);
+    }
+    if(this.musicGain){this.musicGain.gain.setTargetAtTime(level,this.ctx.currentTime,.025);this.player.volume=1;
+      if(this.ctx.state==='suspended'||this.ctx.state==='interrupted')this.ctx.resume().catch(()=>{});
+    }else this.player.volume=level;
     // A browser may still require a fresh gesture after a device interruption.
     if(this.player.paused)this.player.play().catch(()=>{});
   }
@@ -139,5 +147,5 @@ export class AtelierAudio {
   }
   nextMusic(){this.selectMusic((this.track+1)%MUSIC_TRACKS.length,{automatic:true});}
   suspend(){this.player?.pause();this.ctx?.suspend().catch(()=>{});}
-  status(){return {state:this.ctx?.state??'locked',enabled:this.prefs.sound,music:this.prefs.music!==false,volume:this.prefs.volume??.7,musicVolume:this.prefs.musicVolume??.35,track:MUSIC_TRACKS[this.track].title,playing:!!this.player&&!this.player.paused,time:this.player?.currentTime??0,events:this.sequence};}
+  status(){return {state:this.ctx?.state??'locked',enabled:this.prefs.sound,music:this.prefs.music!==false,volume:this.prefs.volume??.7,musicVolume:this.prefs.musicVolume??.35,musicLevel:this.musicGain?.gain.value??this.player?.volume??0,track:MUSIC_TRACKS[this.track].title,playing:!!this.player&&!this.player.paused,time:this.player?.currentTime??0,events:this.sequence};}
 }
