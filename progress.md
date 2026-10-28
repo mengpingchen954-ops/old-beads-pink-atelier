@@ -26,3 +26,10 @@ Original prompt: 新版设计你就是贴了几张图，里面的设计都没改
 新版：https://mengpingchen954-ops.github.io/old-beads-pink-atelier/
 源码：https://github.com/mengpingchen954-ops/old-beads-pink-atelier
 旧版：https://mengpingchen954-ops.github.io/old-beads-new-promises/
+
+
+# 背景音乐
+
+用户要求：使用 E:/Game/美甲/音乐 中的音乐为新版加背景音乐。已接入六首原始 MP3 顺序循环，保留珠子音效，首页/来信/结算/自由搭配连续播放；首次手势启动，后台暂停，总静音及独立音乐开关/音量可保存。待浏览器验证及部署。
+
+本地验证：25 项单元测试、生产构建、桌面/手机原生 MP3 解码及实际播放、六首自然结束循环、跨界面连续、静音与独立音乐音量、后台暂停/恢复、刷新保留设置均通过。珠子接触与音效回归 tests/feel.mjs 通过；技能客户端已运行并检查截图。待 GitHub Pages 发布及匿名播放验证。

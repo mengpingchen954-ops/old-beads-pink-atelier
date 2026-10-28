@@ -74,10 +74,20 @@ export function synthesize(ctx,out,event,{color=0,target='order',pan=0,strength=
   const end=ctx.createOscillator(),silent=ctx.createGain();silent.gain.value=0;end.connect(silent);silent.connect(out);end.start(time);end.stop(time+1.6);
   end.onended=()=>{end.disconnect();silent.disconnect();bus.disconnect();panner?.disconnect();};
 }
+export const MUSIC_TRACKS = [
+  {title:'治愈少女',file:'healing-girl.mp3'},
+  {title:'宁静的微光',file:'quiet-glow.mp3'},
+  {title:'治愈钢琴',file:'healing-piano.mp3'},
+  {title:'治愈系少女',file:'gentle-girl.mp3'},
+  {title:'宁静治愈',file:'quiet-healing.mp3'},
+  {title:'治愈时光',file:'healing-time.mp3'}
+];
+const musicURL=index=>`${import.meta.env?.BASE_URL??'./'}audio/${MUSIC_TRACKS[index].file}`;
 export class AtelierAudio {
-  constructor(prefs){this.prefs=prefs;this.active=false;this.sequence=0;this.step=0;}
+  constructor(prefs){this.prefs=prefs;this.active=false;this.sequence=0;this.track=0;this.failures=0;this.unlocked=false;}
   unlock(){
     if(document.hidden)return;
+    this.unlocked=true;this.syncMusic();
     if(!this.ctx){
       try{
         this.ctx=new(window.AudioContext||window.webkitAudioContext)();
@@ -100,21 +110,17 @@ export class AtelierAudio {
   }
   setActive(active){this.active=active;this.syncMusic();}
   syncMusic(){
-    clearTimeout(this.timer);this.timer=null;
-    if(!this.ctx||this.ctx.state!=='running'||!this.active||!this.prefs.sound||this.prefs.music===false||document.hidden){this.musicBus?.gain.setTargetAtTime(0,this.ctx.currentTime,.08);return;}
-    if(!this.musicBus){this.musicBus=this.ctx.createGain();this.musicBus.connect(this.master);}
-    this.musicBus.gain.setTargetAtTime(1,this.ctx.currentTime,.15);
-    if(!this.nextNote||this.nextNote<this.ctx.currentTime)this.nextNote=this.ctx.currentTime+.08;
-    const schedule=()=>{
-      if(this.nextNote<this.ctx.currentTime+.3){
-        const notes=[261.63,329.63,392,493.88,440,392,329.63,293.66],hz=notes[this.step++%notes.length];
-        partial(this.ctx,this.musicBus,hz,this.nextNote,2.5,.012);partial(this.ctx,this.musicBus,hz*2,this.nextNote,1.2,.0025);
-        this.nextNote+=2.4;
-      }
-      this.timer=setTimeout(schedule,180);
-    };
-    schedule();
+    if(!this.unlocked||!this.active||!this.prefs.sound||this.prefs.music===false||document.hidden||this.failures>=MUSIC_TRACKS.length){this.player?.pause();return;}
+    if(!this.player){
+      this.player=new Audio(musicURL(this.track));this.player.preload='none';
+      this.player.onended=()=>{this.failures=0;this.nextMusic();};
+      this.player.onerror=()=>{if(++this.failures<MUSIC_TRACKS.length)this.nextMusic();};
+    }
+    this.player.volume=Math.max(0,Math.min(1,(this.prefs.volume??.7)*(this.prefs.musicVolume??.35)));
+    // A browser may still require a fresh gesture after a device interruption.
+    if(this.player.paused)this.player.play().catch(()=>{});
   }
-  suspend(){clearTimeout(this.timer);this.timer=null;this.nextNote=0;this.ctx?.suspend().catch(()=>{});}
-  status(){return {state:this.ctx?.state??'locked',enabled:this.prefs.sound,music:this.prefs.music!==false,volume:this.prefs.volume??.7,events:this.sequence};}
+  nextMusic(){this.track=(this.track+1)%MUSIC_TRACKS.length;this.player.src=musicURL(this.track);this.syncMusic();}
+  suspend(){this.player?.pause();this.ctx?.suspend().catch(()=>{});}
+  status(){return {state:this.ctx?.state??'locked',enabled:this.prefs.sound,music:this.prefs.music!==false,volume:this.prefs.volume??.7,musicVolume:this.prefs.musicVolume??.35,track:MUSIC_TRACKS[this.track].title,playing:!!this.player&&!this.player.paused,time:this.player?.currentTime??0,events:this.sequence};}
 }

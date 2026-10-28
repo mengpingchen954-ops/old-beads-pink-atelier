@@ -20,7 +20,7 @@ let progress;try{progress=loadProgress(localStorage);}catch{progress={completed:
 let mode='home',index=0,state,history=[],selected=null,hint=null,board,boardLoading,modal=false,usedHint=false,lastReward=0,designer=null,designGeneration=0;
 const audio=new AtelierAudio(progress);let saveWarning=false,completionTimer,activePointer=null;
 function tone(type='pick',options={}){audio.play(type,options);}
-function syncAudio(){audio.setActive((mode==='play'||mode==='design')&&!modal&&!document.hidden);}
+function syncAudio(){audio.setActive(!document.hidden);}
 function cancelPointer(){designer?.cancel();activePointer=null;document.querySelectorAll('[data-source]').forEach(b=>{if(b._down){b._down=null;b._dragged=true;}});board?.cancelDrag();}
 document.addEventListener('visibilitychange',()=>{if(document.hidden){cancelPointer();audio.suspend();}else{syncAudio();}});
 document.addEventListener('pointerdown',()=>audio.unlock(),{passive:true});
@@ -136,8 +136,9 @@ function gallery(){
 }
 function toggleSound(){progress.sound=!progress.sound;save();audio.apply();$('#sound-btn')?.setAttribute('aria-label',`${progress.sound?'关闭':'开启'}声音`);$('#sound-btn')?.setAttribute('aria-pressed',String(progress.sound));if(progress.sound)tone();toast(progress.sound?'珠声已开启':'珠声已关闭');}
 function audioSettings(){
- openModal(`<div class="eyebrow">听见手作的温度</div><h2>工坊的声音</h2><p>轻取水晶，听一声清脆的回响。珠子接触手链与木盘时，会有不同的轻碰与余响。</p><label class="audio-control" for="volume-slider">声音大小 <output id="volume-value">${Math.round((progress.volume??.7)*100)}%</output></label><input id="volume-slider" type="range" min="0" max="100" value="${Math.round((progress.volume??.7)*100)}"><label class="audio-control"><span>工坊弦音<small>舒缓的原创拨弦，轻轻陪伴</small></span><input id="music-toggle" type="checkbox" ${progress.music!==false?'checked':''}></label><button class="secondary" id="sound-preview">试听珠子轻碰</button><p class="muted">右上角喇叭可关闭全部声音。切到后台时自动暂停。</p><div class="modal-actions"><button class="primary" data-close>回到工作台</button></div>`);
+ openModal(`<div class="eyebrow">听见手作的温度</div><h2>工坊的声音</h2><p>轻取水晶，听一声清脆的回响。珠子接触手链与木盘时，会有不同的轻碰与余响。</p><label class="audio-control" for="volume-slider">整体音量 <output id="volume-value">${Math.round((progress.volume??.7)*100)}%</output></label><input id="volume-slider" type="range" min="0" max="100" value="${Math.round((progress.volume??.7)*100)}"><label class="audio-control"><span>背景音乐<small>6 首治愈音乐，按顺序循环播放</small></span><input id="music-toggle" type="checkbox" ${progress.music!==false?'checked':''}></label><label class="audio-control" for="music-volume-slider">背景音乐音量 <output id="music-volume-value">${Math.round((progress.musicVolume??.35)*100)}%</output></label><input id="music-volume-slider" type="range" min="0" max="100" value="${Math.round((progress.musicVolume??.35)*100)}"><button class="secondary" id="sound-preview">试听珠子轻碰</button><p class="muted">首次点击页面后开始播放。右上角喇叭可关闭全部声音，切到后台时自动暂停。</p><div class="modal-actions"><button class="primary" data-close>回到工作台</button></div>`);
  $('#volume-slider').oninput=e=>{progress.volume=Number(e.target.value)/100;$('#volume-value').textContent=`${e.target.value}%`;audio.apply();save();};
+ $('#music-volume-slider').oninput=e=>{progress.musicVolume=Number(e.target.value)/100;$('#music-volume-value').textContent=`${e.target.value}%`;audio.apply();save();};
  $('#music-toggle').onchange=e=>{progress.music=e.target.checked;audio.apply();save();};
  $('#sound-preview').onclick=()=>{if(!progress.sound)toggleSound();tone('land',{color:1});};
 }
