@@ -14,11 +14,29 @@ try{
   const waitPlaying=()=>page.waitForFunction(()=>{const p=__musicPlayers[0];return p&&!p.paused&&p.readyState>=3&&p.currentTime>0;});
   await page.goto(base);assert.equal(await page.evaluate(()=>__musicPlayers.length),0);
   await click('#sound-home');await waitPlaying();assert.equal((await read()).audio.track,'治愈少女');
+  assert.equal(await page.locator('[data-music-track]').count(),6);
+  for(const i of [2,5,1,4,3,0]){
+   await click(`[data-music-track="${i}"]`);await waitPlaying();
+   assert.equal((await read()).audio.track,MUSIC_TRACKS[i].title);
+   assert.match(await page.locator('#music-current').innerText(),new RegExp(MUSIC_TRACKS[i].title));
+   assert.equal(await page.locator('[data-music-track][aria-pressed="true"]').count(),1);
+   assert.equal(await page.locator(`[data-music-track="${i}"]`).getAttribute('aria-pressed'),'true');
+   assert.ok((await page.evaluate(()=>__musicPlayers[0].src)).endsWith(`/audio/${MUSIC_TRACKS[i].file}`));
+  }
+  if(!mobile){
+   await page.evaluate(()=>{const p=__musicPlayers[0];p.currentTime=p.duration-.15;});
+   await page.waitForFunction(()=>document.querySelector('[data-music-track="1"]').getAttribute('aria-pressed')==='true');await waitPlaying();
+   assert.match(await page.locator('#music-current').innerText(),/宁静的微光/);
+   await page.locator('[data-music-track="0"]').focus();await page.keyboard.press('Enter');await waitPlaying();
+  }
+  const sameTrackTime=(await read()).audio.time;await click('[data-music-track="0"]');assert.ok((await read()).audio.time>=sameTrackTime);
+  assert.equal(await page.evaluate(()=>__musicPlayers.length),1);
   await page.locator('#music-volume-slider').evaluate(el=>{el.value='25';el.dispatchEvent(new Event('input',{bubbles:true}));});
   assert.equal((await read()).audio.musicVolume,.25);assert.ok(Math.abs(await page.evaluate(()=>__musicPlayers[0].volume)-.175)<.001);
   await page.locator('#music-toggle').uncheck();assert.equal((await read()).audio.playing,false);
   const pausedAt=(await read()).audio.time;await page.waitForTimeout(180);assert.equal((await read()).audio.time,pausedAt);
-  await page.locator('#music-toggle').check();await waitPlaying();
+  await click('[data-music-track="4"]');assert.equal((await read()).audio.playing,false);assert.equal((await read()).audio.track,MUSIC_TRACKS[4].title);
+  await page.locator('#music-toggle').check();await waitPlaying();await click('[data-music-track="0"]');await waitPlaying();
   await page.screenshot({path:`artifacts/music-settings-${mobile?'mobile':'desktop'}.png`,fullPage:true});
   await page.getByRole('button',{name:'回到工作台',exact:true}).click();
   const homeTime=(await read()).audio.time;await click('#start-btn');await click('#accept-order');await waitPlaying();assert.ok((await read()).audio.time>=homeTime);assert.equal(await page.evaluate(()=>__musicPlayers.length),1);
@@ -36,10 +54,12 @@ try{
    }
    assert.equal(await page.evaluate(()=>__musicPlayers.length),1);
   }
-  await page.reload();assert.equal((await read()).audio.musicVolume,.25);assert.equal((await read()).audio.playing,false);
+  await click('#design-home');await click('#sound-home');
+  await click('[data-music-track="3"]');await waitPlaying();
+  await page.reload();assert.equal((await read()).audio.track,MUSIC_TRACKS[3].title);assert.equal((await read()).audio.musicVolume,.25);assert.equal((await read()).audio.playing,false);
   // Return from the designer to home after a fresh first gesture.
   await click('#sound-home');await waitPlaying();await page.locator('#music-toggle').uncheck();await page.reload();await click('#sound-home');assert.equal((await read()).audio.music,false);assert.equal((await read()).audio.playing,false);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await context.close();
  }
- assert.deepEqual(errors,[]);console.log('PASS: real MP3 decode and playback, six-track wrap, one player across scenes, first gesture, mute, music toggle, independent volume, background pause/resume, saved settings and mobile.');
+ assert.deepEqual(errors,[]);console.log('PASS: six manual track selections, active state, muted selection and saved track; real MP3 decode and playback, six-track wrap, one player across scenes, first gesture, mute, music toggle, independent volume, background pause/resume, saved settings and mobile.');
 }finally{await browser.close();}

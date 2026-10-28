@@ -8,7 +8,7 @@ import {CONSTRUCTION_AREAS,repairedCount,unlockedAreas} from './construction.js'
 import {levels} from './levels.js';
 import {chapters,customers,commissions} from './content.js';
 import {Board,railPos,bufferPos,orderPos,beadPos,sourcePos,W,H} from './renderer.js';
-import {AtelierAudio} from './audio.js';
+import {AtelierAudio,MUSIC_TRACKS} from './audio.js';
 import {showroom,designBracelet} from './design-ui.js';
 import {mountDesigner} from './design-workbench.js';
 import {art} from './art.js';
@@ -19,6 +19,7 @@ const app=$('#app');
 let progress;try{progress=loadProgress(localStorage);}catch{progress={completed:[],coins:0,sound:true,session:null};}
 let mode='home',index=0,state,history=[],selected=null,hint=null,board,boardLoading,modal=false,usedHint=false,lastReward=0,designer=null,designGeneration=0;
 const audio=new AtelierAudio(progress);let saveWarning=false,completionTimer,activePointer=null;
+audio.onTrackChange=()=>{save();refreshMusicPicker();};
 function tone(type='pick',options={}){audio.play(type,options);}
 function syncAudio(){audio.setActive(!document.hidden);}
 function cancelPointer(){designer?.cancel();activePointer=null;document.querySelectorAll('[data-source]').forEach(b=>{if(b._down){b._down=null;b._dragged=true;}});board?.cancelDrag();}
@@ -135,8 +136,13 @@ function gallery(){
  $('#modal').querySelectorAll('[data-level]').forEach(b=>b.onclick=()=>{const n=Number(b.dataset.level);if(progress.completed.includes(n)){const c=commissions[n];openModal(`<div class="eyebrow">工坊收藏 · ${c.keepsake}</div><h2>${c.title}</h2><div class="reward-bracelets">${levels[n].orders.map(a=>braceletHTML(a)).join('')}</div><p>${c.after}</p><div class="modal-actions"><button class="secondary" id="back-gallery">回作品册</button><button class="primary" id="replay">重新制作</button></div>`);$('#back-gallery').onclick=gallery;$('#replay').onclick=()=>{closeModal();start(n);};}else{closeModal();start(n);}});
 }
 function toggleSound(){progress.sound=!progress.sound;save();audio.apply();$('#sound-btn')?.setAttribute('aria-label',`${progress.sound?'关闭':'开启'}声音`);$('#sound-btn')?.setAttribute('aria-pressed',String(progress.sound));if(progress.sound)tone();toast(progress.sound?'珠声已开启':'珠声已关闭');}
+function refreshMusicPicker(){
+ const current=$('#music-current');if(current)current.textContent=`已选：${audio.status().track}`;
+ document.querySelectorAll('[data-music-track]').forEach(b=>b.setAttribute('aria-pressed',String(Number(b.dataset.musicTrack)===audio.track)));
+}
 function audioSettings(){
- openModal(`<div class="eyebrow">听见手作的温度</div><h2>工坊的声音</h2><p>轻取水晶，听一声清脆的回响。珠子接触手链与木盘时，会有不同的轻碰与余响。</p><label class="audio-control" for="volume-slider">整体音量 <output id="volume-value">${Math.round((progress.volume??.7)*100)}%</output></label><input id="volume-slider" type="range" min="0" max="100" value="${Math.round((progress.volume??.7)*100)}"><label class="audio-control"><span>背景音乐<small>6 首治愈音乐，按顺序循环播放</small></span><input id="music-toggle" type="checkbox" ${progress.music!==false?'checked':''}></label><label class="audio-control" for="music-volume-slider">背景音乐音量 <output id="music-volume-value">${Math.round((progress.musicVolume??.35)*100)}%</output></label><input id="music-volume-slider" type="range" min="0" max="100" value="${Math.round((progress.musicVolume??.35)*100)}"><button class="secondary" id="sound-preview">试听珠子轻碰</button><p class="muted">首次点击页面后开始播放。右上角喇叭可关闭全部声音，切到后台时自动暂停。</p><div class="modal-actions"><button class="primary" data-close>回到工作台</button></div>`);
+ openModal(`<div class="eyebrow">听见手作的温度</div><h2>工坊的声音</h2><p>轻取水晶，听一声清脆的回响。珠子接触手链与木盘时，会有不同的轻碰与余响。</p><label class="audio-control" for="volume-slider">整体音量 <output id="volume-value">${Math.round((progress.volume??.7)*100)}%</output></label><input id="volume-slider" type="range" min="0" max="100" value="${Math.round((progress.volume??.7)*100)}"><label class="audio-control"><span>背景音乐<small>6 首治愈音乐，可随时点选切换</small></span><input id="music-toggle" type="checkbox" ${progress.music!==false?'checked':''}></label><div class="music-picker"><div class="music-picker-heading"><span>选择歌曲</span><output id="music-current" aria-live="polite"></output></div><div class="music-track-list" role="group" aria-label="背景音乐选曲">${MUSIC_TRACKS.map((track,i)=>`<button type="button" data-music-track="${i}" aria-pressed="${i===audio.track}"><span aria-hidden="true">♫</span>${track.title}</button>`).join('')}</div><small>点选即可切换，播放结束后继续下一首。</small></div><label class="audio-control" for="music-volume-slider">背景音乐音量 <output id="music-volume-value">${Math.round((progress.musicVolume??.35)*100)}%</output></label><input id="music-volume-slider" type="range" min="0" max="100" value="${Math.round((progress.musicVolume??.35)*100)}"><button class="secondary" id="sound-preview">试听珠子轻碰</button><p class="muted">首次点击页面后开始播放。右上角喇叭可关闭全部声音，切到后台时自动暂停。</p><div class="modal-actions"><button class="primary" data-close>回到工作台</button></div>`);
+ refreshMusicPicker();document.querySelectorAll('[data-music-track]').forEach(b=>b.onclick=()=>audio.selectMusic(Number(b.dataset.musicTrack)));
  $('#volume-slider').oninput=e=>{progress.volume=Number(e.target.value)/100;$('#volume-value').textContent=`${e.target.value}%`;audio.apply();save();};
  $('#music-volume-slider').oninput=e=>{progress.musicVolume=Number(e.target.value)/100;$('#music-volume-value').textContent=`${e.target.value}%`;audio.apply();save();};
  $('#music-toggle').onchange=e=>{progress.music=e.target.checked;audio.apply();save();};

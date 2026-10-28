@@ -84,7 +84,7 @@ export const MUSIC_TRACKS = [
 ];
 const musicURL=index=>`${import.meta.env?.BASE_URL??'./'}audio/${MUSIC_TRACKS[index].file}`;
 export class AtelierAudio {
-  constructor(prefs){this.prefs=prefs;this.active=false;this.sequence=0;this.track=0;this.failures=0;this.unlocked=false;}
+  constructor(prefs){this.prefs=prefs;this.active=false;this.sequence=0;this.track=Number.isInteger(prefs.musicTrack)&&MUSIC_TRACKS[prefs.musicTrack]?prefs.musicTrack:0;this.failures=0;this.unlocked=false;}
   unlock(){
     if(document.hidden)return;
     this.unlocked=true;this.syncMusic();
@@ -120,7 +120,13 @@ export class AtelierAudio {
     // A browser may still require a fresh gesture after a device interruption.
     if(this.player.paused)this.player.play().catch(()=>{});
   }
-  nextMusic(){this.track=(this.track+1)%MUSIC_TRACKS.length;this.player.src=musicURL(this.track);this.syncMusic();}
+  selectMusic(index,{automatic=false}={}){
+    if(!Number.isInteger(index)||!MUSIC_TRACKS[index])return false;
+    if(!automatic)this.failures=0;
+    if(index!==this.track){this.track=index;if(this.player)this.player.src=musicURL(index);}
+    this.prefs.musicTrack=index;this.syncMusic();this.onTrackChange?.();return true;
+  }
+  nextMusic(){this.selectMusic((this.track+1)%MUSIC_TRACKS.length,{automatic:true});}
   suspend(){this.player?.pause();this.ctx?.suspend().catch(()=>{});}
   status(){return {state:this.ctx?.state??'locked',enabled:this.prefs.sound,music:this.prefs.music!==false,volume:this.prefs.volume??.7,musicVolume:this.prefs.musicVolume??.35,track:MUSIC_TRACKS[this.track].title,playing:!!this.player&&!this.player.paused,time:this.player?.currentTime??0,events:this.sequence};}
 }

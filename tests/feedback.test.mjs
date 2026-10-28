@@ -24,6 +24,7 @@ test('sound settings migrate without losing commissions or accepting invalid vol
   assert.deepEqual(read({volume:9,music:false}).completed,[0,2]);assert.equal(read({volume:9}).volume,1);
   assert.equal(read({volume:-2}).volume,0);assert.equal(read({volume:'loud'}).volume,undefined);
   assert.equal(read({music:false}).music,false);
+  assert.equal(read({musicTrack:4}).musicTrack,4);for(const musicTrack of [-1,6,1.5,'2'])assert.equal(read({musicTrack}).musicTrack,undefined);
   assert.equal(read({musicVolume:9}).musicVolume,1);assert.equal(read({musicVolume:-2}).musicVolume,0);
   assert.equal(read({musicVolume:'loud'}).musicVolume,undefined);assert.equal(read({musicVolume:.25}).musicVolume,.25);
 });

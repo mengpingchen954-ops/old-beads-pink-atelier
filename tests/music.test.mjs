@@ -20,6 +20,9 @@ test('music is lazy, survives autoplay rejection, skips failed tracks and stops 
   audio.player.onended();assert.equal(audio.track,2);assert.equal(audio.failures,0);
   for(let i=0;i<MUSIC_TRACKS.length;i++){audio.player.pause();audio.player.onerror();}
   audio.apply();assert.equal(audio.status().playing,false);assert.equal(created,1);
+  assert.equal(audio.selectMusic(4),true);assert.equal(audio.track,4);assert.equal(audio.prefs.musicTrack,4);assert.equal(audio.status().playing,true);assert.equal(audio.failures,0);
+  for(const index of [-1,6,1.5,'2'])assert.equal(audio.selectMusic(index),false);assert.equal(audio.track,4);
+  assert.equal(new AtelierAudio({musicTrack:3}).track,3);assert.equal(new AtelierAudio({musicTrack:99}).track,0);
   for(const track of MUSIC_TRACKS)assert.ok(statSync(new URL(`../public/audio/${track.file}`,import.meta.url)).size>100000);
  }finally{
   for(const [key,value] of Object.entries(previous)){if(value===undefined)delete globalThis[key];else globalThis[key]=value;}
