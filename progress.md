@@ -11,3 +11,5 @@
 
 - 初始化独立 Git 仓库并推送 `old-beads-pink-atelier`。
 - 启用 GitHub Pages Actions，匿名访问新网址并回归旧网址。
+
+- 已发布：GitHub Pages workflow 通过；匿名验证新旧网址均可打开，旧版标题与入口保持可用。
