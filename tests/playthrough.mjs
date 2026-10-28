@@ -5,20 +5,29 @@ import {levels} from '../src/levels.js';
 import {solve,move,clone,actions,won,createState} from '../src/model.js';
 const base=process.env.GAME_URL||'http://127.0.0.1:5220/';
 fs.mkdirSync('artifacts',{recursive:true});
-const browser=await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader']});
+const browser=await chromium.launch({headless:true});
 const context=await browser.newContext({viewport:{width:1440,height:1000}}),page=await context.newPage(),errors=[];
 page.on('pageerror',e=>errors.push(String(e)));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
 const read=()=>page.evaluate(()=>JSON.parse(window.render_game_to_text()));
 async function perform(a){await page.locator(`[data-source="${a.source.type}-${a.source.index}"]`).click();await page.locator(`[data-target="${a.target.type}-${a.target.index}"]`).click();}
 await page.goto(base);await page.locator('#start-btn').waitFor();await page.screenshot({path:'artifacts/home-desktop.png',fullPage:true});
 await page.locator('#start-btn').click();await page.locator('#accept-order').click();
+async function assertBraceletLayout(p){
+ const boardBox=await p.locator('#board').boundingBox();
+ const orders=await p.locator('[data-target^="order-"]').all();
+ const sources=await p.locator('[data-source^="rail-"],[data-target^="buffer-"]').all();
+ const orderBoxes=await Promise.all(orders.map(el=>el.boundingBox())),sourceBoxes=await Promise.all(sources.map(el=>el.boundingBox()));
+ for(const b of orderBoxes){assert.ok(b.width>boardBox.width*.34,'bracelets are the large visual target');assert.ok(b.y+b.height<Math.min(...sourceBoxes.map(a=>a.y)),'bracelets must be above every material source');assert.ok(b.x>=boardBox.x&&b.x+b.width<=boardBox.x+boardBox.width,'bracelets remain inside the board');}
+ assert.ok(orderBoxes[0].x+orderBoxes[0].width<orderBoxes[1].x,'the two bracelet targets must not overlap');
+}
+await assertBraceletLayout(page);
 await page.locator('[data-source="rail-0"]').click();await page.locator('[data-target="order-1"]').click();assert.equal((await read()).state.moves,0);
 await page.locator('[data-target="buffer-0"]').click();assert.equal((await read()).state.buffer[0],0);
 await page.locator('[data-source="buffer-0"]').click();await page.locator('[data-target="order-0"]').click();assert.equal((await read()).state.orders[0][0],0);
 await page.locator('#undo-btn').click();await page.keyboard.press('z');assert.deepEqual((await read()).state,createState(levels[0]));
 // Actual pointer drag must transfer exactly once, and undo must restore the whole move.
 const s=await page.locator('[data-source="rail-0"]').boundingBox(),t=await page.locator('[data-target="order-0"]').boundingBox();
-await page.mouse.move(s.x+s.width/2,s.y+s.height/2);await page.mouse.down();await page.mouse.move(t.x+t.width/2,t.y+t.height/2,{steps:8});await page.mouse.up();assert.equal((await read()).state.moves,1);await page.locator('#undo-btn').click();
+await page.mouse.move(s.x+s.width/2,s.y+s.height/2);await page.mouse.down();await page.mouse.move(t.x+t.width*.85,t.y+t.height/2,{steps:8});await page.mouse.up();assert.equal((await read()).state.moves,1);await page.locator('#undo-btn').click();
 await page.locator('[data-source="rail-0"]').press('Enter');await page.locator('[data-target="order-0"]').press('Enter');assert.equal((await read()).state.moves,1);await page.keyboard.press('z');assert.deepEqual((await read()).state,createState(levels[0]));
 await page.locator('#help-btn').click();await page.keyboard.press('Escape');assert.equal((await read()).modal,false);
 await page.locator('#sound-btn').click();assert.equal(await page.locator('#sound-btn').getAttribute('aria-pressed'),'false');
@@ -63,6 +72,12 @@ assert.equal((await read()).construction.areas.filter(a=>a.unlocked).length,3);
 const mobile=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:2}),mp=await mobile.newPage();
 mp.on('pageerror',e=>errors.push(String(e)));mp.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
 await mp.goto(base);await mp.locator('#start-btn').waitFor();await mp.screenshot({path:'artifacts/home-mobile.png',fullPage:true});await mp.locator('#start-btn').tap();await mp.locator('#accept-order').tap();
+await assertBraceletLayout(mp);
+const touchSource=await mp.locator('[data-source="rail-0"]').boundingBox(),touchTarget=await mp.locator('[data-target="order-0"]').boundingBox(),touch=await mobile.newCDPSession(mp);
+const touchFrom={x:touchSource.x+touchSource.width/2,y:touchSource.y+touchSource.height/2},touchTo={x:touchTarget.x+touchTarget.width*.85,y:touchTarget.y+touchTarget.height/2};
+await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[touchFrom]});
+for(let i=1;i<=8;i++)await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:touchFrom.x+(touchTo.x-touchFrom.x)*i/8,y:touchFrom.y+(touchTo.y-touchFrom.y)*i/8}]});
+await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});assert.equal((await mp.evaluate(()=>JSON.parse(render_game_to_text()))).state.moves,1);await mp.waitForFunction(()=>JSON.parse(render_game_to_text()).feedback.flights===0);await mp.locator('#undo-btn').tap();await mp.waitForFunction(()=>JSON.parse(render_game_to_text()).state.moves===0);
 const box=await mp.locator('[data-source="rail-0"]').boundingBox();assert.ok(box.width>=40,`mobile target ${box.width}`);
 await mp.locator('[data-source="rail-0"]').tap();await mp.locator('[data-target="buffer-0"]').tap();
 assert.equal(await mp.evaluate(()=>JSON.parse(window.render_game_to_text()).state.moves),1);

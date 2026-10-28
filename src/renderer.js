@@ -5,10 +5,15 @@ import {flightPoint,launchPoint,rebound} from './feedback.js';
 import {accentSlot,braceletLayout,BRACELET_SITES,BRACELET_RADIUS,BRACELET_BEAD_SIZE} from './jewelry.js';
 export let W=1000,H=800;
 let compact=false;
-export const railPos=(i,j=0)=>({x:(compact?140:155)+j*(compact?93:108),y:(compact?140:140)+i*(compact?91:82)});
-export const bufferPos=(i,capacity)=>({x:compact?(capacity===3?200+i*100:250+i*110):725+i*83,y:compact?565:250});
-export const orderPos=i=>({x:compact?180+i*300:290+i*420,y:compact?790:585});
-export function beadPos(i,j,count){const p=orderPos(i),a=-Math.PI/2+accentSlot(j,count)/BRACELET_SITES*Math.PI*2;return {x:p.x+Math.cos(a)*BRACELET_RADIUS,y:p.y+Math.sin(a)*BRACELET_RADIUS};}
+export const railPos=(i,j=0)=>({x:(compact?140:155)+j*(compact?93:108),y:(compact?490:535)+i*(compact?84:60)});
+export const bufferPos=(i,capacity)=>({x:compact?(capacity===3?200+i*100:250+i*110):725+i*83,y:compact?865:630});
+export const orderPos=i=>({x:compact?180+i*300:275+i*450,y:compact?220:245});
+export const braceletScale=()=>compact?1.375:1.75;
+export const playBeadSize=()=>BRACELET_BEAD_SIZE*braceletScale();
+export const orderHitSize=()=>compact?290:370;
+export const railBeadSize=()=>compact?78:68;
+export const railHitHeight=()=>compact?82:60;
+export function beadPos(i,j,count){const p=orderPos(i),a=-Math.PI/2+accentSlot(j,count)/BRACELET_SITES*Math.PI*2;return {x:p.x+Math.cos(a)*BRACELET_RADIUS*braceletScale(),y:p.y+Math.sin(a)*BRACELET_RADIUS*braceletScale()};}
 export function sourcePos(source,capacity){return source.type==='rail'?railPos(source.index):bufferPos(source.index,capacity);}
 export function designPos(i){const a=-Math.PI/2+i*Math.PI/6,r=compact?177:190;return {x:W/2+Math.cos(a)*r,y:(compact?278:305)+Math.sin(a)*r};}
 export const launcherPos=()=>({x:W/2,y:compact?622:623});
@@ -45,37 +50,37 @@ export class Board {
     this.image('workbench',W/2,H/2,W,H,-5);
     this.image('roses',compact?57:62,42,compact?76:95,compact?68:85,5);
     this.image('roses',W-57,H-55,compact?70:87,compact?63:78,5);
-    this.text('配 珠 料 杆',compact?330:320,compact?65:65,20,'#9c5e77');
-    if(!compact){this.text('暂 存 木 盘',805,130,18,'#9c5e77');this.text('用完珠子后腾空',805,170,13,'#a0867b');}
+    this.text('配 珠 料 杆',compact?330:320,compact?435:490,18,'#9c5e77');
+    if(!compact){this.text('暂 存 木 盘',805,535,18,'#9c5e77');this.text('用完珠子后腾空',805,571,13,'#a0867b');}
     state.rails.forEach((rail,i)=>{
       const p=railPos(i);this.text('ABCD'[i],compact?76:85,p.y,18,'#b07a7b');
       const left=compact?108:120,right=compact?546:575;
       this.rect((left+right)/2,p.y+3,right-left,12,'#b88073',-1);this.rect((left+right)/2,p.y-1,right-left-3,7,'#f1c3a0',0);this.rect((left+right)/2,p.y-4,right-left-6,2,'#ffe0bf',0);
       this.circle(right,p.y,6,'#bb8678',0);this.circle(left,p.y,6,'#c89986',0);
       if(!rail.length)this.text('已取空',compact?330:320,p.y,14,'#b59d90');
-      rail.forEach((c,j)=>this.bead(`rail-${i}-${j}`,c,railPos(i,j),83));
-      if(rail.length){this.text('‹',p.x-50,p.y,26,'#aa6b81');if(selected?.type==='rail'&&selected.index===i)this.ring(p.x,p.y,40,'#86a592',3);}
+      rail.forEach((c,j)=>this.bead(`rail-${i}-${j}`,c,railPos(i,j),railBeadSize()));
+      if(rail.length){this.text('‹',p.x-50,p.y,26,'#aa6b81');if(selected?.type==='rail'&&selected.index===i)this.ring(p.x,p.y,railBeadSize()*.48,'#86a592',3);}
     });
-    if(compact)this.text('暂 存 木 盘',330,490,18,'#9c5e77');
+    if(compact)this.text('暂 存 木 盘',330,805,18,'#9c5e77');
     state.buffer.forEach((c,i)=>{const p=bufferPos(i,level.capacity);this.image('well',p.x,p.y,90,90,0);this.rims.set(`buffer-${i}`,this.ring(p.x,p.y,32,'#b7a482',1,.12));if(c!==null)this.bead(`buffer-${i}`,c,p,83);else this.text('＋',p.x,p.y,22,'#c4a294');if(selected?.type==='buffer'&&selected.index===i)this.ring(p.x,p.y,43,'#86a592',3);});
-    this.text(`${state.buffer.filter(c=>c!==null).length} / ${level.capacity} 格占用`,compact?330:805,compact?635:330,13,'#a0867b');
-    if(!compact)this.rect(500,424,820,1,'#d8b7a7',-1,.6);
+    this.text(`${state.buffer.filter(c=>c!==null).length} / ${level.capacity} 格占用`,compact?330:805,compact?920:710,13,'#a0867b');
+    this.rect(W/2,compact?410:472,compact?540:820,1,'#d8b7a7',-1,.6);
     state.orders.forEach((done,i)=>{
-      const p=orderPos(i), goal=level.orders[i];
+      const p=orderPos(i),goal=level.orders[i],scale=braceletScale(),radius=BRACELET_RADIUS*scale,mat=radius+32;
       // A scalloped lace mat and pearl stitching surround the actual interactive bracelet.
-      for(let j=0;j<24;j++){const a=j/24*Math.PI*2;this.circle(p.x+Math.cos(a)*111,p.y+Math.sin(a)*111,10,'#fff9ec',-2);}
-      this.circle(p.x,p.y,113,'#fff8e8',-1);this.ring(p.x,p.y,106,'#dab8ad',0,.6);this.rims.set(`order-${i}`,this.ring(p.x,p.y,BRACELET_RADIUS,'#b69483'));
-      this.text(`手 串 ${i+1}`,p.x,p.y-143,18,'#9e6578');
+      for(let j=0;j<24;j++){const a=j/24*Math.PI*2;this.circle(p.x+Math.cos(a)*(mat-1),p.y+Math.sin(a)*(mat-1),9,'#fff9ec',-2);}
+      this.circle(p.x,p.y,mat,'#fff8e8',-1);this.ring(p.x,p.y,mat-7,'#dab8ad',0,.6);this.rims.set(`order-${i}`,this.ring(p.x,p.y,radius,'#b69483'));
+      this.text(`手 串 ${i+1}`,p.x,compact?58:52,20,'#9e6578');
       braceletLayout(goal).forEach(({slot,goalIndex:j,color,x,y,angle})=>{
-        const q={x:p.x+x*BRACELET_RADIUS,y:p.y+y*BRACELET_RADIUS},base=j<0;
-        const mesh=this.bead(base?`base-${i}-${slot}`:`order-${i}-${j}`,color,q,BRACELET_BEAD_SIZE,base||j<done.length?1:.18);mesh.userData.order=i;mesh.userData.slot=slot;
-        if(!base){const a=angle+Math.PI/BRACELET_SITES,s=this.rect(p.x+Math.cos(a)*BRACELET_RADIUS,p.y+Math.sin(a)*BRACELET_RADIUS,3.5,12,'#c5aa83',3);s.rotation.z=a;}
-        if(j===done.length){this.ring(q.x,q.y,18,'#6b9d87',3);this.circle(q.x+13,q.y-13,3,'#6b9d87',4);}
+        const q={x:p.x+x*radius,y:p.y+y*radius},base=j<0;
+        const mesh=this.bead(base?`base-${i}-${slot}`:`order-${i}-${j}`,color,q,playBeadSize(),base||j<done.length?1:.18);mesh.userData.order=i;mesh.userData.slot=slot;
+        if(!base){const a=angle+Math.PI/BRACELET_SITES,s=this.rect(p.x+Math.cos(a)*radius,p.y+Math.sin(a)*radius,3.5*scale,12*scale,'#c5aa83',3);s.rotation.z=a;}
+        if(j===done.length){this.ring(q.x,q.y,18*scale,'#6b9d87',3);this.circle(q.x+13*scale,q.y-13*scale,3*scale,'#6b9d87',4);}
       });
-      this.text(`${done.length} / ${goal.length}`,p.x,p.y,20,'#9c6e7b');
-      const next=goal[done.length];this.text(next===undefined?'已完成 ✓':`下一颗 · ${COLORS[next].name}`,p.x,p.y+146,17,next===undefined?'#739c7c':'#956c7a');
+      this.text(`${done.length} / ${goal.length}`,p.x,p.y,compact?23:28,'#9c6e7b');
+      const next=goal[done.length];this.text(next===undefined?'已完成 ✓':`下一颗 · ${COLORS[next].name}`,p.x,p.y+(compact?170:200),compact?18:20,next===undefined?'#739c7c':'#956c7a');
     });
-    if(hint){const p=sourcePos(hint.source,level.capacity),q=hint.target.type==='order'?orderPos(hint.target.index):bufferPos(hint.target.index,level.capacity);this.ring(p.x,p.y,45,'#ba9146',4);this.ring(q.x,q.y,hint.target.type==='order'?112:45,'#ba9146',4);}
+    if(hint){const p=sourcePos(hint.source,level.capacity),q=hint.target.type==='order'?orderPos(hint.target.index):bufferPos(hint.target.index,level.capacity);this.ring(p.x,p.y,45,'#ba9146',4);this.ring(q.x,q.y,hint.target.type==='order'?BRACELET_RADIUS*braceletScale()+32:45,'#ba9146',4);}
     this.frame(performance.now());
   }
   drawDesign(view){
@@ -110,7 +115,7 @@ export class Board {
   point(clientX,clientY){const r=this.host.getBoundingClientRect();return {x:(clientX-r.left)/r.width*W,y:(clientY-r.top)/r.height*H};}
   floating(color,point,size=83){const mesh=this.image(COLORS[color].file,point.x,point.y,size,size,12);this.fx.add(mesh);return mesh;}
   beginDrag(source,color,point,touch=false){
-    this.releaseDrag();this.interruptSource(source);this.drag={key:this.sourceKey(source),source,color,point,contacts:new Set(),origin:sourcePos(source,this.last[1].capacity),touch,mesh:this.floating(color,point),shadow:this.circle(point.x,point.y,28,'#594b36',9,.16)};this.fx.add(this.drag.shadow);this.moveDrag(point);return true;
+    this.releaseDrag();this.interruptSource(source);const size=source.type==='rail'?railBeadSize():83;this.drag={size,key:this.sourceKey(source),source,color,point,contacts:new Set(),origin:sourcePos(source,this.last[1].capacity),touch,mesh:this.floating(color,point,size),shadow:this.circle(point.x,point.y,28,'#594b36',9,.16)};this.fx.add(this.drag.shadow);this.moveDrag(point);return true;
   }
   beginDesignDrag(index,color,point,touch=false){
     this.releaseDrag();this.cancelFlights([index]);const size=designBeadSize();
@@ -143,13 +148,13 @@ export class Board {
   animate(color,from,to,{key,target,source,returning=false,onImpact,launch=false,endSize}={}){
     if(this.reduced){onImpact?.();this.render();return;}
     if(source?.type==='rail')for(const e of this.effects)if(e.source?.type==='rail'&&e.source.index===source.index)e.source=null;
-    const mesh=this.floating(color,from),shadow=this.circle(from.x,from.y+18,25,'#594b36',8,.12);this.fx.add(shadow);
-    this.effects.push({type:'flight',mesh,shadow,color,from,to,key,target,source,returning,onImpact,launch,endSize,start:performance.now(),duration:returning?180:launch?560:260,landed:false});
+    const startSize=source?.type==='rail'?railBeadSize():83,mesh=this.floating(color,from,startSize),shadow=this.circle(from.x,from.y+18,25,'#594b36',8,.12);this.fx.add(shadow);
+    this.effects.push({type:'flight',mesh,shadow,color,from,to,key,target,source,returning,onImpact,launch,startSize,endSize,start:performance.now(),duration:returning?180:launch?560:260,landed:false});
     if(launch)this.effects.push({type:'recoil',key:'launcher',start:performance.now(),duration:340});
     this.frame(performance.now());
   }
   reject(target){
-    const p=target.type==='order'?orderPos(target.index):bufferPos(target.index,this.last[1].capacity),ring=this.ring(p.x,p.y,target.type==='order'?109:43,'#ac6446',7,.8);this.fx.add(ring);
+    const p=target.type==='order'?orderPos(target.index):bufferPos(target.index,this.last[1].capacity),ring=this.ring(p.x,p.y,target.type==='order'?BRACELET_RADIUS*braceletScale()+32:43,'#ac6446',7,.8);this.fx.add(ring);
     this.effects.push({type:'reject',mesh:ring,target,start:performance.now(),duration:360});this.frame(performance.now());
   }
   impact(effect,now){
@@ -158,7 +163,7 @@ export class Board {
     for(let i=0;i<5;i++){const a=i/5*Math.PI*2,mesh=this.circle(effect.to.x,effect.to.y,1.5,'#c7a460',9,.75);this.fx.add(mesh);this.effects.push({type:'spark',mesh,origin:effect.to,dx:Math.cos(a)*28,dy:Math.sin(a)*20-9,start:now,duration:400});}
     effect.onImpact?.();
   }
-  celebrate(index){if(this.reduced)return;const p=orderPos(index),mesh=this.ring(p.x,p.y,100,'#b7954a',7,.8);this.fx.add(mesh);this.effects.push({type:'thread',mesh,index,start:performance.now(),duration:650});}
+  celebrate(index){if(this.reduced)return;const p=orderPos(index),mesh=this.ring(p.x,p.y,BRACELET_RADIUS*braceletScale()+20,'#b7954a',7,.8);this.fx.add(mesh);this.effects.push({type:'thread',mesh,index,start:performance.now(),duration:650});}
   cancelFeedback(){cancelAnimationFrame(this.raf);this.releaseDrag();for(const e of this.effects??[]){this.removeFx(e.mesh);this.removeFx(e.shadow);}this.effects=[];}
   frame(now){
     cancelAnimationFrame(this.raf);
@@ -173,7 +178,7 @@ export class Board {
       if(e.type==='flight'){
         const dest=this.beads.get(e.key);
         if(age<e.duration){
-          if(dest)dest.visible=false;const p=e.launch?launchPoint(t,e.from,e.to):flightPoint(t,e.from,e.to,e.returning?12:35),size=83+((e.endSize??(e.target?.type==='order'?BRACELET_BEAD_SIZE:83))-83)*t;
+          if(dest)dest.visible=false;const p=e.launch?launchPoint(t,e.from,e.to):flightPoint(t,e.from,e.to,e.returning?12:35),size=e.startSize+((e.endSize??(e.target?.type==='order'?playBeadSize():83))-e.startSize)*t;
           e.mesh.position.set(p.x,p.y,12);e.mesh.scale.set(size,-size,1);e.mesh.rotation.z=Math.sin(t*Math.PI)*(e.launch ? .8 : .19);
           e.shadow.position.set(p.x+3,p.y+14+Math.sin(t*Math.PI)*16,8);e.shadow.scale.set(.8,.25,1);e.shadow.material.opacity=.12*(1-.5*Math.sin(t*Math.PI));
           if(e.source?.type==='rail')for(let j=0;j<5;j++){const m=this.beads.get(`rail-${e.source.index}-${j}`);if(m){m.position.x+=(compact?93:108)*(1-t)**3;m.rotation.z=rebound(age/1000, .12);}}

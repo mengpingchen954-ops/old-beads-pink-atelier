@@ -7,7 +7,7 @@ import {COLORS,createState,clone,move,colorAt,legal,won,actions,solve,loadProgre
 import {CONSTRUCTION_AREAS,repairedCount,unlockedAreas} from './construction.js';
 import {levels} from './levels.js';
 import {chapters,customers,commissions} from './content.js';
-import {Board,railPos,bufferPos,orderPos,beadPos,sourcePos,W,H} from './renderer.js';
+import {Board,railPos,bufferPos,orderPos,beadPos,sourcePos,orderHitSize,railHitHeight,W,H} from './renderer.js';
 import {AtelierAudio,MUSIC_TRACKS} from './audio.js';
 import {showroom,designBracelet} from './design-ui.js';
 import {mountDesigner} from './design-workbench.js';
@@ -95,9 +95,9 @@ function refresh(){
  if(!board||mode!=='play')return;const level=levels[index];board.draw(state,level,selected,hint);
  const focused=document.activeElement,focusKey=focused?.dataset?.source?['source',focused.dataset.source]:focused?.dataset?.target?['target',focused.dataset.target]:null;
  const layer=$('#hit-layer');layer.innerHTML='';
- state.rails.forEach((a,i)=>{if(a.length)layer.append(hitButton(`料杆 ${'ABCD'[i]}，外端${COLORS[a[0]].name}`,{type:'rail',index:i},null,railPos(i)));});
+ state.rails.forEach((a,i)=>{if(a.length)layer.append(hitButton(`料杆 ${'ABCD'[i]}，外端${COLORS[a[0]].name}`,{type:'rail',index:i},null,railPos(i),82,railHitHeight()));});
  state.buffer.forEach((c,i)=>layer.append(hitButton(c===null?`放入暂存格 ${i+1}`:`暂存格 ${i+1}，${COLORS[c].name}`,c!==null?{type:'buffer',index:i}:null,c===null?{type:'buffer',index:i}:null,bufferPos(i,level.capacity))));
- state.orders.forEach((a,i)=>{const next=level.orders[i][a.length];layer.append(hitButton(next===undefined?`手链 ${i+1} 已完成`:`串入手链 ${i+1}，需要${COLORS[next].name}`,null,{type:'order',index:i},orderPos(i),244,225));});
+ state.orders.forEach((a,i)=>{const next=level.orders[i][a.length];layer.append(hitButton(next===undefined?`手链 ${i+1} 已完成`:`串入手链 ${i+1}，需要${COLORS[next].name}`,null,{type:'order',index:i},orderPos(i),orderHitSize(),orderHitSize()));});
  $('#move-count').textContent=`${state.moves} 步`;
  $('#undo-btn').disabled=!history.length;$('#sound-btn').setAttribute('aria-pressed',String(progress.sound));
  if(focusKey)layer.querySelector(`[data-${focusKey[0]}="${focusKey[1]}"]`)?.focus({preventScroll:true});
