@@ -40,15 +40,42 @@ try{
   await page.screenshot({path:`artifacts/music-settings-${mobile?'mobile':'desktop'}.png`,fullPage:true});
   await page.getByRole('button',{name:'回到工作台',exact:true}).click();
   const homeTime=(await read()).audio.time;await click('#start-btn');await click('#accept-order');await waitPlaying();assert.ok((await read()).audio.time>=homeTime);assert.equal(await page.evaluate(()=>__musicPlayers.length),1);
-  await click('#sound-btn');assert.equal((await read()).audio.playing,false);await click('#sound-btn');await waitPlaying();
+  const beforeButtonTrack=(await read()).audio.track;
+  await click('#sound-btn');await page.waitForTimeout(480);
+  assert.equal((await read()).audio.track,MUSIC_TRACKS[(MUSIC_TRACKS.findIndex(t=>t.title===beforeButtonTrack)+1)%MUSIC_TRACKS.length].title);
+  assert.equal((await read()).modal,false);
+  const beforeDoubleTrack=(await read()).audio.track;
+  if(mobile){await click('#sound-btn');await click('#sound-btn');}else await page.locator('#sound-btn').dblclick();
+  await page.locator('#volume-slider').waitFor();await page.waitForTimeout(480);
+  assert.equal((await read()).audio.track,beforeDoubleTrack);
+  await page.locator('#volume-slider').fill('60');assert.equal((await read()).audio.volume,.6);
+  await page.screenshot({path:`artifacts/speaker-volume-${mobile?'mobile':'desktop'}.png`,fullPage:true});
+  await page.getByRole('button',{name:'回到工作台',exact:true}).click();
+  // A slower double gesture still opens settings without changing the song.
+  const soundBox=await page.locator('#sound-btn').boundingBox(),soundX=soundBox.x+soundBox.width/2,soundY=soundBox.y+soundBox.height/2;
+  const soundTap=()=>mobile?page.touchscreen.tap(soundX,soundY):page.mouse.click(soundX,soundY);
+  await soundTap();await page.waitForTimeout(300);await soundTap();
+  await page.locator('#volume-slider').waitFor();await page.waitForTimeout(480);assert.equal((await read()).audio.track,beforeDoubleTrack);
+  await page.locator('#sound-toggle').uncheck();assert.equal((await read()).audio.playing,false);
+  await page.locator('#sound-toggle').check();await waitPlaying();
+  await page.getByRole('button',{name:'回到工作台',exact:true}).click();
+  // Opening another dialog cancels a pending skip rather than changing music behind it.
+  await click('#sound-btn');await click('#help-btn');await page.waitForTimeout(480);assert.equal((await read()).audio.track,beforeDoubleTrack);
+  await page.keyboard.press('Escape');
+  if(!mobile){
+   await page.locator('#sound-btn').focus();await page.keyboard.press('Enter');await page.waitForTimeout(480);
+   const next=MUSIC_TRACKS[(MUSIC_TRACKS.findIndex(t=>t.title===beforeDoubleTrack)+1)%MUSIC_TRACKS.length].title;assert.equal((await read()).audio.track,next);
+  }
+  const beforeNavigationTrack=(await read()).audio.track;await click('#sound-btn');await click('#go-home');await page.waitForTimeout(480);assert.equal((await read()).audio.track,beforeNavigationTrack);
   // Visibility event follows the same path as switching a real tab to the background.
   await page.evaluate(()=>{Object.defineProperty(document,'hidden',{value:true,configurable:true});document.dispatchEvent(new Event('visibilitychange'));});
   assert.equal((await read()).audio.playing,false);
   await page.evaluate(()=>{Object.defineProperty(document,'hidden',{value:false,configurable:true});document.dispatchEvent(new Event('visibilitychange'));});await waitPlaying();
-  await click('#go-home');await click('#design-home-entry');await page.waitForFunction(()=>JSON.parse(render_game_to_text()).design);assert.equal((await read()).audio.playing,true);
+  await click('#design-home-entry');await page.waitForFunction(()=>JSON.parse(render_game_to_text()).design);assert.equal((await read()).audio.playing,true);
   if(!mobile){
+   const loopTrack=(await read()).audio.track,loopStart=MUSIC_TRACKS.findIndex(t=>t.title===loopTrack);
    for(let i=0;i<6;i++){
-    const next=MUSIC_TRACKS[(i+1)%6].title;
+    const next=MUSIC_TRACKS[(loopStart+i+1)%6].title;
     await page.evaluate(()=>{const p=__musicPlayers[0];p.currentTime=p.duration-.15;});
     await page.waitForFunction(title=>JSON.parse(render_game_to_text()).audio.track===title,next);await waitPlaying();
    }
@@ -56,10 +83,10 @@ try{
   }
   await click('#design-home');await click('#sound-home');
   await click('[data-music-track="3"]');await waitPlaying();
-  await page.reload();assert.equal((await read()).audio.track,MUSIC_TRACKS[3].title);assert.equal((await read()).audio.musicVolume,.25);assert.equal((await read()).audio.playing,false);
+  await page.reload();assert.equal((await read()).audio.track,MUSIC_TRACKS[3].title);assert.equal((await read()).audio.musicVolume,.25);assert.equal((await read()).audio.volume,.6);assert.equal((await read()).audio.playing,false);
   // Return from the designer to home after a fresh first gesture.
   await click('#sound-home');await waitPlaying();await page.locator('#music-toggle').uncheck();await page.reload();await click('#sound-home');assert.equal((await read()).audio.music,false);assert.equal((await read()).audio.playing,false);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await context.close();
  }
- assert.deepEqual(errors,[]);console.log('PASS: six manual track selections, active state, muted selection and saved track; real MP3 decode and playback, six-track wrap, one player across scenes, first gesture, mute, music toggle, independent volume, background pause/resume, saved settings and mobile.');
+ assert.deepEqual(errors,[]);console.log('PASS: six manual track selections, speaker single-click next and double-click volume settings, master mute, real MP3 decode and playback, six-track wrap, one player across scenes, first gesture, music toggle, independent volume, background pause/resume, saved settings and mobile.');
 }finally{await browser.close();}

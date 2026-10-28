@@ -32,7 +32,7 @@ const slider=await page.locator('#volume-slider').boundingBox();await page.mouse
 assert.ok((await read()).audio.volume>.3&&(await read()).audio.volume<.5);await click('#sound-preview');
 await page.screenshot({path:'artifacts/feel-audio-settings.png'});await page.getByRole('button',{name:'回到工作台',exact:true}).click();
 await page.reload();await click('#start-btn');assert.equal((await read()).audio.music,false);assert.ok((await read()).audio.volume<.5);
-await click('#sound-btn');const muted=(await read()).audio.events;await click('[data-source="rail-0"]');await click('[data-target="order-0"]');await settle();assert.equal((await read()).audio.events,muted);
+await click('#audio-settings');await page.locator('#sound-toggle').uncheck();const muted=(await read()).audio.events;await page.getByRole('button',{name:'回到工作台',exact:true}).click();await click('[data-source="rail-0"]');await click('[data-target="order-0"]');await settle();assert.equal((await read()).audio.events,muted);
 // Render the real audio synthesis offline: audible, bounded, distinct timbres, and quiet tails.
 const sourceAudio=fs.readFileSync('src/audio.js','utf8');
 const rendered=await page.evaluate(async code=>{

@@ -30,7 +30,7 @@ const s=await page.locator('[data-source="rail-0"]').boundingBox(),t=await page.
 await page.mouse.move(s.x+s.width/2,s.y+s.height/2);await page.mouse.down();await page.mouse.move(t.x+t.width*.85,t.y+t.height/2,{steps:8});await page.mouse.up();assert.equal((await read()).state.moves,1);await page.locator('#undo-btn').click();
 await page.locator('[data-source="rail-0"]').press('Enter');await page.locator('[data-target="order-0"]').press('Enter');assert.equal((await read()).state.moves,1);await page.keyboard.press('z');assert.deepEqual((await read()).state,createState(levels[0]));
 await page.locator('#help-btn').click();await page.keyboard.press('Escape');assert.equal((await read()).modal,false);
-await page.locator('#sound-btn').click();assert.equal(await page.locator('#sound-btn').getAttribute('aria-pressed'),'false');
+await page.locator('#audio-settings').click();await page.locator('#sound-toggle').uncheck();assert.equal((await read()).audio.enabled,false);await page.getByRole('button',{name:'回到工作台',exact:true}).click();
 await page.screenshot({path:'artifacts/play-desktop.png',fullPage:true});
 for(let i=0;i<12;i++){
  let info=await read();assert.equal(info.level,i+1);
