@@ -19,7 +19,8 @@ for(const engine of [chromium,webkit]){
     const boxes=await page.locator('.board-hit').evaluateAll(es=>es.map(e=>e.getBoundingClientRect().toJSON()));
     for(const b of boxes)assert.ok(b.width>=43.9&&b.height>=43.9,`${tag}: touch target ${b.width}x${b.height}`);
     const rows=await page.locator('[data-source^="rail-"]').evaluateAll(es=>es.map(e=>e.getBoundingClientRect().toJSON()));
-    for(let i=1;i<rows.length;i++)assert.ok(rows[i].top>=rows[i-1].bottom-.1,`${tag}: material targets must not overlap`);
+    for(let i=0;i<rows.length;i++)for(let j=i+1;j<rows.length;j++)assert.ok(rows[i].right<=rows[j].left+.1||rows[j].right<=rows[i].left+.1||rows[i].bottom<=rows[j].top+.1||rows[j].bottom<=rows[i].top+.1,`${tag}: material targets must not overlap`);
+    if(width<=760&&rows.length){const orders=await page.locator('[data-target^="order-"]').all();const order=await orders[0].boundingBox(),board=await page.locator('#board').boundingBox();assert.ok(order.width>board.width*.46,'bracelets dominate the width');assert.ok(Math.max(...rows.map(b=>b.bottom))-Math.min(...rows.map(b=>b.top))<order.height*.7,'material rows occupy less height than the bracelets');}
    }
    await page.goto(base);await page.locator('#start-btn').waitFor();await fits();
    if(width<=760)assert.ok((await page.locator('#start-btn').boundingBox()).y+65<=height,`${tag}: start visible without scrolling`);

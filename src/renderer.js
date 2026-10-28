@@ -5,13 +5,13 @@ import {flightPoint,launchPoint,rebound} from './feedback.js';
 import {accentSlot,braceletLayout,BRACELET_SITES,BRACELET_RADIUS,BRACELET_BEAD_SIZE} from './jewelry.js';
 export let W=1000,H=800;
 let compact=false;
-export const railPos=(i,j=0)=>({x:(compact?140:155)+j*(compact?93:108),y:(compact?490:535)+i*(compact?100:64)});
-export const bufferPos=(i,capacity)=>({x:compact?(capacity===3?200+i*100:250+i*110):725+i*83,y:compact?910:630});
-export const orderPos=i=>({x:compact?180+i*300:275+i*450,y:compact?220:245});
-export const braceletScale=()=>compact?1.375:1.75;
+export const railPos=(i,j=0)=>({x:compact?100+(i%2)*330+j*44:155+j*108,y:compact?500+Math.floor(i/2)*100:535+i*64});
+export const bufferPos=(i,capacity)=>({x:compact?(capacity===3?230+i*100:280+i*100):725+i*83,y:compact?720:630});
+export const orderPos=i=>({x:compact?165+i*330:275+i*450,y:compact?230:245});
+export const braceletScale=()=>compact?1.55:1.75;
 export const playBeadSize=()=>BRACELET_BEAD_SIZE*braceletScale();
-export const orderHitSize=()=>compact?290:370;
-export const railBeadSize=()=>compact?78:68;
+export const orderHitSize=()=>compact?306:370;
+export const railBeadSize=()=>compact?60:68;
 export const railHitHeight=()=>compact?98:64;
 export function beadPos(i,j,count){const p=orderPos(i),a=-Math.PI/2+accentSlot(j,count)/BRACELET_SITES*Math.PI*2;return {x:p.x+Math.cos(a)*BRACELET_RADIUS*braceletScale(),y:p.y+Math.sin(a)*BRACELET_RADIUS*braceletScale()};}
 export function sourcePos(source,capacity){return source.type==='rail'?railPos(source.index):bufferPos(source.index,capacity);}
@@ -31,7 +31,7 @@ export class Board {
   }
   mount(host){this.cancelFeedback();this.resizeObserver.disconnect();this.host=host;host.prepend(this.renderer.domElement);this.resizeObserver.observe(host);this.resize();}
   async load(){const loader=new THREE.TextureLoader();await Promise.all(['workbench','well','roses',...COLORS.map(c=>c.file)].map(async name=>{const t=await loader.loadAsync(art(name));t.colorSpace=THREE.SRGBColorSpace;this.textures[name]=t;}));}
-  resize(){const next=innerWidth<=760,changed=next!==compact;if(changed)this.cancelFeedback();compact=next;W=compact?660:1000;H=compact?(this.designView?740:1000):(this.designView?700:800);this.host.style.aspectRatio=`${W}/${H}`;this.camera.right=W;this.camera.bottom=H;this.camera.updateProjectionMatrix();const r=this.host.getBoundingClientRect();this.renderer.setSize(r.width,r.height,false);if(changed&&(this.last||this.designView)){if(this.designView)this.drawDesign(this.designView);else this.draw(...this.last);this.host.dispatchEvent(new Event('board-layout'));}else this.render();}
+  resize(){const next=innerWidth<=760,changed=next!==compact;if(changed)this.cancelFeedback();compact=next;W=compact?660:1000;H=compact?(this.designView?740:840):(this.designView?700:800);this.host.style.aspectRatio=`${W}/${H}`;this.camera.right=W;this.camera.bottom=H;this.camera.updateProjectionMatrix();const r=this.host.getBoundingClientRect();this.renderer.setSize(r.width,r.height,false);if(changed&&(this.last||this.designView)){if(this.designView)this.drawDesign(this.designView);else this.draw(...this.last);this.host.dispatchEvent(new Event('board-layout'));}else this.render();}
   clear(){for(const o of [...this.group.children]){this.group.remove(o);if(o.geometry!==this.geometry)o.geometry?.dispose();if(o.material?.map?.userData?.temporary)o.material.map.dispose();o.material?.dispose();}}
   plane(x,y,w,h,material,z=0){material.side=THREE.DoubleSide;const mesh=new THREE.Mesh(this.geometry,material);mesh.position.set(x,y,z);mesh.scale.set(w,-h,1);this.group.add(mesh);return mesh;}
   rect(x,y,w,h,color,z=0,opacity=1){return this.plane(x,y,w,h,new THREE.MeshBasicMaterial({color,transparent:true,opacity,depthWrite:false}),z);}
@@ -46,26 +46,28 @@ export class Board {
     this.plane(x,y,c.width/2,c.height/2,new THREE.MeshBasicMaterial({map:tex,transparent:true,depthWrite:false}),4);
   }
   draw(state,level,selected,hint){
-    this.designView=null;if(H!==(compact?1000:800))this.resize();
+    this.designView=null;if(H!==(compact?840:800))this.resize();
     this.last=[state,level,selected,hint];this.clear();this.beads.clear();this.rims.clear();
     this.image('workbench',W/2,H/2,W,H,-5);
     this.image('roses',compact?57:62,42,compact?76:95,compact?68:85,5);
     this.image('roses',W-57,H-55,compact?70:87,compact?63:78,5);
-    this.text('配 珠 料 杆',compact?330:320,compact?435:490,18,'#9c5e77');
+    this.text('配 珠 料 杆',compact?330:320,compact?445:490,18,'#9c5e77');
     if(!compact){this.text('暂 存 木 盘',805,535,18,'#9c5e77');this.text('用完珠子后腾空',805,571,13,'#a0867b');}
     state.rails.forEach((rail,i)=>{
-      const p=railPos(i);this.text('ABCD'[i],compact?76:85,p.y,18,'#b07a7b');
-      const left=compact?108:120,right=compact?546:575;
+      const p=railPos(i);this.text('ABCD'[i],compact?p.x-56:85,p.y,18,'#b07a7b');
+      if(compact)this.rect(p.x+55,p.y,250,86,'#f5e4d8',-2,.65);
+      const left=compact?p.x-20:120,right=compact?p.x+165:575;
       this.rect((left+right)/2,p.y+3,right-left,12,'#b88073',-1);this.rect((left+right)/2,p.y-1,right-left-3,7,'#f1c3a0',0);this.rect((left+right)/2,p.y-4,right-left-6,2,'#ffe0bf',0);
       this.circle(right,p.y,6,'#bb8678',0);this.circle(left,p.y,6,'#c89986',0);
-      if(!rail.length)this.text('已取空',compact?330:320,p.y,14,'#b59d90');
-      rail.forEach((c,j)=>this.bead(`rail-${i}-${j}`,c,railPos(i,j),railBeadSize()));
-      if(rail.length){this.text('‹',p.x-50,p.y,26,'#aa6b81');if(selected?.type==='rail'&&selected.index===i)this.ring(p.x,p.y,railBeadSize()*.48,'#86a592',3);}
+      if(!rail.length)this.text('已取空',compact?p.x+80:320,p.y,14,'#b59d90');
+      // Overlap the queue previews while keeping the selectable first bead in front.
+      for(let j=rail.length-1;j>=0;j--)this.bead(`rail-${i}-${j}`,rail[j],railPos(i,j),compact&&j>0?48:railBeadSize());
+      if(rail.length){this.text('‹',p.x-(compact?37:50),p.y,26,'#aa6b81');if(selected?.type==='rail'&&selected.index===i)this.ring(p.x,p.y,railBeadSize()*.48,'#86a592',3);}
     });
-    if(compact)this.text('暂 存 木 盘',330,850,18,'#9c5e77');
+    if(compact)this.text('暂 存 木 盘',330,665,18,'#9c5e77');
     state.buffer.forEach((c,i)=>{const p=bufferPos(i,level.capacity);this.image('well',p.x,p.y,90,90,0);this.rims.set(`buffer-${i}`,this.ring(p.x,p.y,32,'#b7a482',1,.12));if(c!==null)this.bead(`buffer-${i}`,c,p,83);else this.text('＋',p.x,p.y,22,'#c4a294');if(selected?.type==='buffer'&&selected.index===i)this.ring(p.x,p.y,43,'#86a592',3);});
-    this.text(`${state.buffer.filter(c=>c!==null).length} / ${level.capacity} 格占用`,compact?330:805,compact?970:710,13,'#a0867b');
-    this.rect(W/2,compact?410:472,compact?540:820,1,'#d8b7a7',-1,.6);
+    this.text(`${state.buffer.filter(c=>c!==null).length} / ${level.capacity} 格占用`,compact?330:805,compact?780:710,13,'#a0867b');
+    this.rect(W/2,compact?422:472,compact?540:820,1,'#d8b7a7',-1,.6);
     state.orders.forEach((done,i)=>{
       const p=orderPos(i),goal=level.orders[i],scale=braceletScale(),radius=BRACELET_RADIUS*scale,mat=radius+32;
       // A scalloped lace mat and pearl stitching surround the actual interactive bracelet.
@@ -79,7 +81,7 @@ export class Board {
         if(j===done.length){this.ring(q.x,q.y,18*scale,'#6b9d87',3);this.circle(q.x+13*scale,q.y-13*scale,3*scale,'#6b9d87',4);}
       });
       this.text(`${done.length} / ${goal.length}`,p.x,p.y,compact?23:28,'#9c6e7b');
-      const next=goal[done.length];this.text(next===undefined?'已完成 ✓':`下一颗 · ${COLORS[next].name}`,p.x,p.y+(compact?170:200),compact?18:20,next===undefined?'#739c7c':'#956c7a');
+      const next=goal[done.length];this.text(next===undefined?'已完成 ✓':`下一颗 · ${COLORS[next].name}`,p.x,p.y+(compact?175:200),compact?18:20,next===undefined?'#739c7c':'#956c7a');
     });
     if(hint){const p=sourcePos(hint.source,level.capacity),q=hint.target.type==='order'?orderPos(hint.target.index):bufferPos(hint.target.index,level.capacity);this.ring(p.x,p.y,45,'#ba9146',4);this.ring(q.x,q.y,hint.target.type==='order'?BRACELET_RADIUS*braceletScale()+32:45,'#ba9146',4);}
     this.frame(performance.now());
@@ -182,7 +184,7 @@ export class Board {
           if(dest)dest.visible=false;const p=e.launch?launchPoint(t,e.from,e.to):flightPoint(t,e.from,e.to,e.returning?12:35),size=e.startSize+((e.endSize??(e.target?.type==='order'?playBeadSize():83))-e.startSize)*t;
           e.mesh.position.set(p.x,p.y,12);e.mesh.scale.set(size,-size,1);e.mesh.rotation.z=Math.sin(t*Math.PI)*(e.launch ? .8 : .19);
           e.shadow.position.set(p.x+3,p.y+14+Math.sin(t*Math.PI)*16,8);e.shadow.scale.set(.8,.25,1);e.shadow.material.opacity=.12*(1-.5*Math.sin(t*Math.PI));
-          if(e.source?.type==='rail')for(let j=0;j<5;j++){const m=this.beads.get(`rail-${e.source.index}-${j}`);if(m){m.position.x+=(compact?93:108)*(1-t)**3;m.rotation.z=rebound(age/1000, .12);}}
+          if(e.source?.type==='rail')for(let j=0;j<5;j++){const m=this.beads.get(`rail-${e.source.index}-${j}`);if(m){m.position.x+=(compact?44:108)*(1-t)**3;m.rotation.z=rebound(age/1000, .12);}}
         }else if(!e.landed){e.landed=true;if(e.returning)e.onImpact?.();else this.impact(e,now);}
       }else if(e.type==='impact'){
         const spring=rebound(age/1000),m=this.beads.get(e.key);if(m){m.position.y+=spring*7;m.scale.x*=1+spring*.09;m.scale.y*=1-spring*.07;m.rotation.z=spring*.12;}
