@@ -21,4 +21,8 @@ Original prompt: 新版设计你就是贴了几张图，里面的设计都没改
 - `tests/world-playthrough.mjs`：实际首关通关、保留建造星、手动花星、重玩不重复奖励、刷新、旧存档保护、三场景修复层与手机无横向溢出通过。
 - 已运行 develop-web-game 技能浏览器客户端并检查截图，另检查桌面/手机闯关、自由搭配、结算、地图、建设预览和三片区域的实际截图。
 
-发布状态：本轮修订待推送新版仓库并完成 GitHub Pages 匿名访问回归；旧版网址继续保留。
+发布状态：修订 b5d520e 已推送，新版 GitHub Pages 构建和部署成功（Actions 40652922331）。匿名浏览器在公开子路径通过实际首关、重复通关、手动修复、持久化、三场景修复层、素材加载、自由搭配、手机无横向溢出检查，未发现页面异常或资源 404。实际线上截图保存于忽略目录 artifacts/published-play.png 和 artifacts/published-designer.png。原版公开页面及开始入口也正常，旧仓库无跟踪文件变更。
+
+新版：https://mengpingchen954-ops.github.io/old-beads-pink-atelier/
+源码：https://github.com/mengpingchen954-ops/old-beads-pink-atelier
+旧版：https://mengpingchen954-ops.github.io/old-beads-new-promises/
