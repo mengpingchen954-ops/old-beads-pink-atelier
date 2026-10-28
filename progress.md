@@ -87,3 +87,5 @@ Original prompt: 新版设计你就是贴了几张图，里面的设计都没改
 验证：25 项单元测试、生产构建通过。tests/mobile-playthrough.mjs 在 Chromium、WebKit 两个引擎的 320×568、360×640、390×844、430×932、700×900、844×390 触屏上下文通过：首屏入口、44px 材料目标与料杆不重叠、点选/撤销、单点切歌/双点音量不误切歌、真实触摸滑块、弹窗回位、材料分类防误选、自由搭配、四排料杆、已完成作品册、旋转与刷新存档；最小屏另测首关通关、奖励和建设。并模拟 iOS 只读媒体音量，读取真实 MP3 的 PCM，确认独立增益可让音乐有声、静音和恢复。WebKit WinCairo 没有暴露 AudioContext，仅验证其布局、WebGL、MP3 和触屏；合成音效与音频输出由 Chromium 验证，尚未实体 iPhone/Android 测试。
 
 原有 tests/music-playthrough.mjs、ui-sounds.mjs、feel.mjs、playthrough.mjs、design-playthrough.mjs、launch-playthrough.mjs 回归通过；尺寸更新改为下一帧后再执行完整关卡与弹射拖动复测。已运行技能客户端，读取状态并查看画布截图，也已查看最小屏游戏/奖励/作品册、WebKit 四排料杆、700px 搭配与实际底部按钮截图。截图保存在忽略的 artifacts/。待 GitHub Pages 发布和公开匿名页面复测。
+
+已发布：0976666，GitHub Pages Actions 40683449125 构建与部署成功。公开子路径匿名浏览器重新通过 tests/mobile-playthrough.mjs 的两引擎六组触屏尺寸及真实 MP3 音量输出测试，也通过 tests/music-playthrough.mjs 和 tests/ui-sounds.mjs，未发现页面异常或资源加载错误。额外等待页面图片实际解码后查看线上手机首页、工作台及音量设置截图；素材均正确加载。未触碰原版网址。
