@@ -1,6 +1,6 @@
 import {COLORS} from './materials.js';
 export const MATERIALS = COLORS.map((_,color)=>({color,count:color===0?1:color===3?7:4}));
-export const TRAYS = [{id:'ivory',name:'珍珠白绒盘',price:0},{id:'azure',name:'海湾蓝绒盘',price:180},{id:'gold',name:'暖金丝绒盘',price:320}];
+export const TRAYS = [{id:'ivory',name:'珍珠白绒盘',price:0},{id:'azure',name:'樱雾紫绒盘',price:180},{id:'gold',name:'暖金丝绒盘',price:320}];
 export const freshDesign = () => Array(12).fill(null);
 export const remaining = (slots,color) => MATERIALS.find(m=>m.color===color)?.count-slots.filter(c=>c===color).length;
 export function validDraft(slots){return Array.isArray(slots)&&slots.length===12&&slots.every(c=>c===null||MATERIALS.some(m=>m.color===c))&&MATERIALS.every(m=>remaining(slots,m.color)>=0);}

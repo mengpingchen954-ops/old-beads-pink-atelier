@@ -1,12 +1,13 @@
 import * as THREE from 'three';
+import {art} from './art.js';
 import {COLORS} from './model.js';
 import {flightPoint,launchPoint,rebound} from './feedback.js';
 import {accentSlot,braceletLayout,BRACELET_SITES,BRACELET_RADIUS,BRACELET_BEAD_SIZE} from './jewelry.js';
-export let W=1000,H=700;
+export let W=1000,H=800;
 let compact=false;
-export const railPos=(i,j=0)=>({x:(compact?140:145)+j*(compact?93:81),y:(compact?150:168)+i*91});
-export const bufferPos=(i,capacity)=>({x:compact?(capacity===3?200+i*100:250+i*110):(capacity===3?143+i*100:170+i*110),y:compact?540:580});
-export const orderPos=i=>({x:compact?180+i*300:741,y:compact?747:212+i*264});
+export const railPos=(i,j=0)=>({x:(compact?140:155)+j*(compact?93:108),y:(compact?140:140)+i*(compact?91:82)});
+export const bufferPos=(i,capacity)=>({x:compact?(capacity===3?200+i*100:250+i*110):725+i*83,y:compact?565:250});
+export const orderPos=i=>({x:compact?180+i*300:290+i*420,y:compact?790:585});
 export function beadPos(i,j,count){const p=orderPos(i),a=-Math.PI/2+accentSlot(j,count)/BRACELET_SITES*Math.PI*2;return {x:p.x+Math.cos(a)*BRACELET_RADIUS,y:p.y+Math.sin(a)*BRACELET_RADIUS};}
 export function sourcePos(source,capacity){return source.type==='rail'?railPos(source.index):bufferPos(source.index,capacity);}
 export function designPos(i){const a=-Math.PI/2+i*Math.PI/6,r=compact?177:190;return {x:W/2+Math.cos(a)*r,y:(compact?278:305)+Math.sin(a)*r};}
@@ -15,7 +16,7 @@ export const designBeadSize=()=>compact?120:124;
 export class Board {
   constructor(host){
     this.host=host;this.scene=new THREE.Scene();this.camera=new THREE.OrthographicCamera(0,W,0,H,.1,100);this.camera.position.z=30;
-    this.renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'low-power'});this.renderer.setClearColor('#edf7ff');this.renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+    this.renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'low-power'});this.renderer.setClearColor('#fae4df');this.renderer.setPixelRatio(Math.min(devicePixelRatio,2));
     this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.domElement.setAttribute('aria-hidden','true');host.prepend(this.renderer.domElement);
     this.group=new THREE.Group();this.fx=new THREE.Group();this.scene.add(this.group,this.fx);this.effects=[];this.beads=new Map();this.rims=new Map();this.textures={};this.geometry=new THREE.PlaneGeometry(1,1);this.reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
     this.resizeObserver=new ResizeObserver(()=>this.resize());this.resizeObserver.observe(host);this.resize();
@@ -23,8 +24,8 @@ export class Board {
     this.renderer.domElement.addEventListener('webglcontextrestored',()=>{if(this.designView)this.drawDesign(this.designView);else if(this.last)this.draw(...this.last);this.host.dispatchEvent(new Event('board-restored'));});
   }
   mount(host){this.cancelFeedback();this.resizeObserver.disconnect();this.host=host;host.prepend(this.renderer.domElement);this.resizeObserver.observe(host);this.resize();}
-  async load(){const loader=new THREE.TextureLoader();await Promise.all(['workbench',...COLORS.map(c=>c.file)].map(async name=>{const t=await loader.loadAsync(`${import.meta.env.BASE_URL}art/${name}.svg`);t.colorSpace=THREE.SRGBColorSpace;this.textures[name]=t;}));}
-  resize(){const next=innerWidth<=600,changed=next!==compact;if(changed)this.cancelFeedback();compact=next;W=compact?660:1000;H=compact?(this.designView?740:910):700;this.host.style.aspectRatio=`${W}/${H}`;this.camera.right=W;this.camera.bottom=H;this.camera.updateProjectionMatrix();const r=this.host.getBoundingClientRect();this.renderer.setSize(r.width,r.height,false);if(changed&&(this.last||this.designView)){if(this.designView)this.drawDesign(this.designView);else this.draw(...this.last);this.host.dispatchEvent(new Event('board-layout'));}else this.render();}
+  async load(){const loader=new THREE.TextureLoader();await Promise.all(['workbench','well','roses',...COLORS.map(c=>c.file)].map(async name=>{const t=await loader.loadAsync(art(name));t.colorSpace=THREE.SRGBColorSpace;this.textures[name]=t;}));}
+  resize(){const next=innerWidth<=600,changed=next!==compact;if(changed)this.cancelFeedback();compact=next;W=compact?660:1000;H=compact?(this.designView?740:1000):(this.designView?700:800);this.host.style.aspectRatio=`${W}/${H}`;this.camera.right=W;this.camera.bottom=H;this.camera.updateProjectionMatrix();const r=this.host.getBoundingClientRect();this.renderer.setSize(r.width,r.height,false);if(changed&&(this.last||this.designView)){if(this.designView)this.drawDesign(this.designView);else this.draw(...this.last);this.host.dispatchEvent(new Event('board-layout'));}else this.render();}
   clear(){for(const o of [...this.group.children]){this.group.remove(o);if(o.geometry!==this.geometry)o.geometry?.dispose();if(o.material?.map?.userData?.temporary)o.material.map.dispose();o.material?.dispose();}}
   plane(x,y,w,h,material,z=0){material.side=THREE.DoubleSide;const mesh=new THREE.Mesh(this.geometry,material);mesh.position.set(x,y,z);mesh.scale.set(w,-h,1);this.group.add(mesh);return mesh;}
   rect(x,y,w,h,color,z=0,opacity=1){return this.plane(x,y,w,h,new THREE.MeshBasicMaterial({color,transparent:true,opacity,depthWrite:false}),z);}
@@ -39,60 +40,69 @@ export class Board {
     this.plane(x,y,c.width/2,c.height/2,new THREE.MeshBasicMaterial({map:tex,transparent:true,depthWrite:false}),4);
   }
   draw(state,level,selected,hint){
-    this.designView=null;if(compact&&H!==910)this.resize();
+    this.designView=null;if(H!==(compact?1000:800))this.resize();
     this.last=[state,level,selected,hint];this.clear();this.beads.clear();this.rims.clear();
     this.image('workbench',W/2,H/2,W,H,-5);
-    this.text('料 杆 · 只 能 从 左 端 取 珠',compact?330:287,compact?82:90,17,'#5d6655');
-    if(!compact){this.text('定 制 手 链',741,82,17,'#5d6655');this.rect(515,351,1,490,'#c7bba1',-1);}
+    this.image('roses',compact?57:62,42,compact?76:95,compact?68:85,5);
+    this.image('roses',W-57,H-55,compact?70:87,compact?63:78,5);
+    this.text('配 珠 料 杆',compact?330:320,compact?65:65,20,'#9c5e77');
+    if(!compact){this.text('暂 存 木 盘',805,130,18,'#9c5e77');this.text('用完珠子后腾空',805,170,13,'#a0867b');}
     state.rails.forEach((rail,i)=>{
-      const p=railPos(i);this.text('ABCD'[i],76,p.y,17,'#a08a58');
-      this.rect(compact?325:294,p.y,compact?430:365,4,'#ad8d51',-1);this.circle(compact?540:467,p.y,5,'#b6995b',0);
-      this.ring(p.x,p.y,34,'#b9a57d',0,.45);
-      if(!rail.length)this.text('已取空',285,p.y,15,'#a39881');
-      rail.forEach((c,j)=>{const q=railPos(i,j);this.bead(`rail-${i}-${j}`,c,q,83);});
-      if(rail.length){this.text('‹',p.x-53,p.y,27,'#8e774c');if(selected?.type==='rail'&&selected.index===i)this.ring(p.x,p.y,40,'#365e4d',3);}
+      const p=railPos(i);this.text('ABCD'[i],compact?76:85,p.y,18,'#b07a7b');
+      const left=compact?108:120,right=compact?546:575;
+      this.rect((left+right)/2,p.y+3,right-left,12,'#b88073',-1);this.rect((left+right)/2,p.y-1,right-left-3,7,'#f1c3a0',0);this.rect((left+right)/2,p.y-4,right-left-6,2,'#ffe0bf',0);
+      this.circle(right,p.y,6,'#bb8678',0);this.circle(left,p.y,6,'#c89986',0);
+      if(!rail.length)this.text('已取空',compact?330:320,p.y,14,'#b59d90');
+      rail.forEach((c,j)=>this.bead(`rail-${i}-${j}`,c,railPos(i,j),83));
+      if(rail.length){this.text('‹',p.x-50,p.y,26,'#aa6b81');if(selected?.type==='rail'&&selected.index===i)this.ring(p.x,p.y,40,'#86a592',3);}
     });
-    this.text('暂 存 盘',compact?330:237,compact?485:520,17,'#5d6655');
-    state.buffer.forEach((c,i)=>{const p=bufferPos(i,level.capacity);this.circle(p.x+2,p.y+4,41,'#988465',-1,.13);this.circle(p.x,p.y,41,'#e5dcc8');this.rims.set(`buffer-${i}`,this.ring(p.x,p.y,39,'#b7a482'));this.ring(p.x,p.y,32,'#ccbea3',0,.5);if(c!==null)this.bead(`buffer-${i}`,c,p,83);else this.text('＋',p.x,p.y,24,'#b7a98d');if(selected?.type==='buffer'&&selected.index===i)this.ring(p.x,p.y,43,'#365e4d',3);});
-    this.text(`${state.buffer.filter(c=>c!==null).length} / ${level.capacity} 格占用 · 用完即可腾空`,compact?330:240,compact?604:642,14,'#8a7e67');
+    if(compact)this.text('暂 存 木 盘',330,490,18,'#9c5e77');
+    state.buffer.forEach((c,i)=>{const p=bufferPos(i,level.capacity);this.image('well',p.x,p.y,90,90,0);this.rims.set(`buffer-${i}`,this.ring(p.x,p.y,32,'#b7a482',1,.12));if(c!==null)this.bead(`buffer-${i}`,c,p,83);else this.text('＋',p.x,p.y,22,'#c4a294');if(selected?.type==='buffer'&&selected.index===i)this.ring(p.x,p.y,43,'#86a592',3);});
+    this.text(`${state.buffer.filter(c=>c!==null).length} / ${level.capacity} 格占用`,compact?330:805,compact?635:330,13,'#a0867b');
+    if(!compact)this.rect(500,424,820,1,'#d8b7a7',-1,.6);
     state.orders.forEach((done,i)=>{
-      const p=orderPos(i), goal=level.orders[i];this.circle(p.x+2,p.y+4,105,'#988465',-1,.12);this.circle(p.x,p.y,106,'#f1ead9',0);this.ring(p.x,p.y,102,'#c7b692');this.rims.set(`order-${i}`,this.ring(p.x,p.y,BRACELET_RADIUS,'#b79657'));
+      const p=orderPos(i), goal=level.orders[i];
+      // A scalloped lace mat and pearl stitching surround the actual interactive bracelet.
+      for(let j=0;j<24;j++){const a=j/24*Math.PI*2;this.circle(p.x+Math.cos(a)*111,p.y+Math.sin(a)*111,10,'#fff9ec',-2);}
+      this.circle(p.x,p.y,113,'#fff8e8',-1);this.ring(p.x,p.y,106,'#dab8ad',0,.6);this.rims.set(`order-${i}`,this.ring(p.x,p.y,BRACELET_RADIUS,'#b69483'));
+      this.text(`手 串 ${i+1}`,p.x,p.y-143,18,'#9e6578');
       braceletLayout(goal).forEach(({slot,goalIndex:j,color,x,y,angle})=>{
         const q={x:p.x+x*BRACELET_RADIUS,y:p.y+y*BRACELET_RADIUS},base=j<0;
-        const mesh=this.bead(base?`base-${i}-${slot}`:`order-${i}-${j}`,color,q,BRACELET_BEAD_SIZE,base||j<done.length?1:.24);mesh.userData.order=i;mesh.userData.slot=slot;
-        if(!base){const a=angle+Math.PI/BRACELET_SITES,s=this.rect(p.x+Math.cos(a)*BRACELET_RADIUS,p.y+Math.sin(a)*BRACELET_RADIUS,3.5,12,'#baa06a',3);s.rotation.z=a;this.circle(s.position.x-1,s.position.y-2,1.2,'#fff3ca',4,.7);}
-        if(j===done.length){this.ring(q.x,q.y,18,'#48725b',3);this.circle(q.x+13,q.y-13,3,'#48725b',4);}
+        const mesh=this.bead(base?`base-${i}-${slot}`:`order-${i}-${j}`,color,q,BRACELET_BEAD_SIZE,base||j<done.length?1:.18);mesh.userData.order=i;mesh.userData.slot=slot;
+        if(!base){const a=angle+Math.PI/BRACELET_SITES,s=this.rect(p.x+Math.cos(a)*BRACELET_RADIUS,p.y+Math.sin(a)*BRACELET_RADIUS,3.5,12,'#c5aa83',3);s.rotation.z=a;}
+        if(j===done.length){this.ring(q.x,q.y,18,'#6b9d87',3);this.circle(q.x+13,q.y-13,3,'#6b9d87',4);}
       });
-      this.circle(p.x,p.y+BRACELET_RADIUS+18,4,'#c2a76d',3);this.circle(p.x,p.y+BRACELET_RADIUS+25,5,'#e5d8b4',3);this.ring(p.x,p.y+BRACELET_RADIUS+25,5,'#b69b60',4);
-      this.text(`配珠 ${i+1}`,p.x,p.y-12,17,'#6a634f');this.text(`${done.length} / ${goal.length}`,p.x,p.y+15,19,'#47634e');
-      const next=goal[done.length];this.text(next===undefined?'已完成 ✓':`下一颗 · ${COLORS[next].name}${COLORS[next].symbol}`,p.x,p.y+136,16,next===undefined?'#3c7255':'#6d735d');
+      this.text(`${done.length} / ${goal.length}`,p.x,p.y,20,'#9c6e7b');
+      const next=goal[done.length];this.text(next===undefined?'已完成 ✓':`下一颗 · ${COLORS[next].name}`,p.x,p.y+146,17,next===undefined?'#739c7c':'#956c7a');
     });
     if(hint){const p=sourcePos(hint.source,level.capacity),q=hint.target.type==='order'?orderPos(hint.target.index):bufferPos(hint.target.index,level.capacity);this.ring(p.x,p.y,45,'#ba9146',4);this.ring(q.x,q.y,hint.target.type==='order'?112:45,'#ba9146',4);}
     this.frame(performance.now());
   }
   drawDesign(view){
-    this.designView=view;this.last=null;if(compact&&H!==740)this.resize();this.clear();this.beads.clear();this.rims.clear();
+    this.designView=view;this.last=null;if(H!==(compact?740:700))this.resize();this.clear();this.beads.clear();this.rims.clear();
     this.image('workbench',W/2,H/2,W,H,-5);
+    this.image('roses',compact?57:62,42,compact?76:95,compact?68:85,5);
+    this.image('roses',W-57,H-55,compact?70:87,compact?63:78,5);
     const cy=compact?278:305,r=compact?177:190;
-    this.circle(W/2+4,cy+9,r+74,'#b0c9e4',-3,.22);this.circle(W/2,cy,r+68,'#ffffff',-2);this.ring(W/2,cy,r+65,'#d9b66a',-1);
+    this.circle(W/2+4,cy+9,r+74,'#d9a7b4',-3,.22);this.circle(W/2,cy,r+68,'#ffffff',-2);this.ring(W/2,cy,r+65,'#d9b66a',-1);
     this.ring(W/2,cy,r,'#c6a45c');
-    for(let y=cy-r-35;y<cy+r+35;y+=18)this.rect(W/2,y,2,8,'#a9c8e8',0,.8);
-    this.text('听 海 的 旧 约',W/2,cy-20,compact?24:27,'#275cad');
-    this.text('左 右 对 称 · 随 你 搭 配',W/2,cy+22,15,'#6b8fb5');
-    this.text('从 空 串 开 始 · 每 颗 珠 子 亲 手 串 起',W/2,35,14,'#416da5');
+    for(let y=cy-r-35;y<cy+r+35;y+=18)this.rect(W/2,y,2,8,'#dfbdca',0,.8);
+    this.text('听 海 的 旧 约',W/2,cy-20,compact?24:27,'#ac617e');
+    this.text('左 右 对 称 · 随 你 搭 配',W/2,cy+22,15,'#ac8396');
+    this.text('从 空 串 开 始 · 每 颗 珠 子 亲 手 串 起',W/2,35,14,'#a07688');
     const launcher=launcherPos();
     if(view.aim!==null&&view.aim!==undefined&&view.color!==null){for(let i=1;i<12;i++){const p=launchPoint(i/12,launcher,designPos(view.aim));this.circle(p.x,p.y,2.1,'#e3b951',1,.48);}}
     view.slots.forEach((color,i)=>{const p=designPos(i),size=designBeadSize();
-      if(color!==null){this.circle(p.x+2,p.y+4,size*.43,'#b3ccea',0,.2);const m=this.bead(`design-${i}`,color,p,size);m.userData.designSlot=i;}else this.text('＋',p.x,p.y,18,'#a5bfd7');
-      this.rims.set(`design-${i}`,this.ring(p.x,p.y,color===null?10:size*.43,view.aim===i?'#e6b940':'#d7e7f8',3,view.aim===i?.7:.18));
-      if(view.selected===i)this.ring(p.x,p.y,size*.49,'#2587f5',4);
+      if(color!==null){this.circle(p.x+2,p.y+4,size*.43,'#ce9bae',0,.2);const m=this.bead(`design-${i}`,color,p,size);m.userData.designSlot=i;}else this.text('＋',p.x,p.y,18,'#c1a1ad');
+      this.rims.set(`design-${i}`,this.ring(p.x,p.y,color===null?10:size*.43,view.aim===i?'#e6b940':'#e9cbd3',3,view.aim===i?.7:.18));
+      if(view.selected===i)this.ring(p.x,p.y,size*.49,'#c66e90',4);
       const a=-Math.PI/2+i*Math.PI/6;
-      this.text(String(i+1),p.x+Math.cos(a)*(size*.54),p.y+Math.sin(a)*(size*.54),12,'#7797b7');
+      this.text(String(i+1),p.x+Math.cos(a)*(size*.54),p.y+Math.sin(a)*(size*.54),12,'#b58e9d');
     });
-    this.circle(launcher.x,launcher.y+9,51,'#b2cce8',0,.35);this.circle(launcher.x,launcher.y,49,'#2877d6',1);this.ring(launcher.x,launcher.y,48,'#f3ca64',3);
+    this.circle(launcher.x,launcher.y+9,51,'#d8a7b4',0,.35);this.circle(launcher.x,launcher.y,49,'#d28ba2',1);this.ring(launcher.x,launcher.y,48,'#f3ca64',3);
     this.rect(launcher.x-49,launcher.y+5,7,46,'#dcb85e',3);this.rect(launcher.x+49,launcher.y+5,7,46,'#dcb85e',3);
     if(view.color!==null)this.bead('launcher',view.color,launcher,86);
-    this.text(view.color===null?'取下模式':'点 此 弹 射',W/2,compact?699:687,15,'#2e65ad');
+    this.text(view.color===null?'取下模式':'点 此 弹 射',W/2,compact?699:687,15,'#a85a7d');
     this.frame(performance.now());
   }
   sourceKey(source){return source.type==='rail'?`rail-${source.index}-0`:`buffer-${source.index}`;}
@@ -166,7 +176,7 @@ export class Board {
           if(dest)dest.visible=false;const p=e.launch?launchPoint(t,e.from,e.to):flightPoint(t,e.from,e.to,e.returning?12:35),size=83+((e.endSize??(e.target?.type==='order'?BRACELET_BEAD_SIZE:83))-83)*t;
           e.mesh.position.set(p.x,p.y,12);e.mesh.scale.set(size,-size,1);e.mesh.rotation.z=Math.sin(t*Math.PI)*(e.launch ? .8 : .19);
           e.shadow.position.set(p.x+3,p.y+14+Math.sin(t*Math.PI)*16,8);e.shadow.scale.set(.8,.25,1);e.shadow.material.opacity=.12*(1-.5*Math.sin(t*Math.PI));
-          if(e.source?.type==='rail')for(let j=0;j<5;j++){const m=this.beads.get(`rail-${e.source.index}-${j}`);if(m){m.position.x+=(compact?93:81)*(1-t)**3;m.rotation.z=rebound(age/1000, .12);}}
+          if(e.source?.type==='rail')for(let j=0;j<5;j++){const m=this.beads.get(`rail-${e.source.index}-${j}`);if(m){m.position.x+=(compact?93:108)*(1-t)**3;m.rotation.z=rebound(age/1000, .12);}}
         }else if(!e.landed){e.landed=true;if(e.returning)e.onImpact?.();else this.impact(e,now);}
       }else if(e.type==='impact'){
         const spring=rebound(age/1000),m=this.beads.get(e.key);if(m){m.position.y+=spring*7;m.scale.x*=1+spring*.09;m.scale.y*=1-spring*.07;m.rotation.z=spring*.12;}

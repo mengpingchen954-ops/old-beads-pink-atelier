@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {levels} from '../src/levels.js';
 import {solve,move,clone,actions,won,createState} from '../src/model.js';
-const base=process.env.GAME_URL||'http://127.0.0.1:5198/';
+const base=process.env.GAME_URL||'http://127.0.0.1:5220/';
 fs.mkdirSync('artifacts',{recursive:true});
 const browser=await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader']});
 const context=await browser.newContext({viewport:{width:1440,height:1000}}),page=await context.newPage(),errors=[];
@@ -44,6 +44,22 @@ for(let i=0;i<12;i++){
 }
 await page.locator('#next-order').click();assert.equal((await read()).completed.length,12);await page.screenshot({path:'artifacts/collection.png',fullPage:true});
 await page.getByRole('button',{name:'关闭窗口'}).click();await page.reload();await page.locator('#collection-home').click();assert.equal(await page.locator('.gallery-item.done').count(),12);
+// Exercise all construction resources through the public UI, including unspent-star persistence.
+await page.getByRole('button',{name:'关闭窗口'}).click();
+assert.equal((await read()).construction.available,12);
+await page.reload();assert.equal((await read()).construction.available,12);
+for(let i=0;i<12;i++){
+ await page.locator('#build-home').click();
+ if(i===0)await page.screenshot({path:'artifacts/build-preview.png',fullPage:true});
+ await page.locator('#confirm-build').click();
+ assert.equal((await read()).construction.repaired,i+1);
+ assert.equal((await read()).construction.available,11-i);
+ if(i===3||i===7)await page.locator('#visit-area').click();
+ if(i===3||i===7||i===11)await page.screenshot({path:`artifacts/built-area-${i+1}.png`,fullPage:true});
+}
+assert.equal(await page.locator('#build-home').isDisabled(),true);
+await page.reload();assert.equal((await read()).construction.repaired,12);assert.equal((await read()).construction.available,0);
+assert.equal((await read()).construction.areas.filter(a=>a.unlocked).length,3);
 const mobile=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:2}),mp=await mobile.newPage();
 mp.on('pageerror',e=>errors.push(String(e)));mp.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
 await mp.goto(base);await mp.locator('#start-btn').waitFor();await mp.screenshot({path:'artifacts/home-mobile.png',fullPage:true});await mp.locator('#start-btn').tap();await mp.locator('#accept-order').tap();

@@ -1,7 +1,7 @@
 import {chromium} from 'playwright';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-const base=process.env.GAME_URL||'http://127.0.0.1:5198/';
+const base=process.env.GAME_URL||'http://127.0.0.1:5220/';
 fs.mkdirSync('artifacts',{recursive:true});
 const browser=await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader']});
 const errors=[];
