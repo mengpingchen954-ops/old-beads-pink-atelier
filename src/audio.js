@@ -49,6 +49,17 @@ export function synthesize(ctx,out,event,{color=0,target='order',pan=0,strength=
     m.partials.forEach((ratio,i)=>partial(ctx,bus,(wood?510:m.hz)*ratio*pitch,at,(wood ? .07 : m.decay)/(1+i*.6),.105*energy/(1+i*2.3)));
     brush(ctx,bus,at,(wood ? .24 : m.noise)*energy*.25);
   };
+  if(event.startsWith('ui-')){
+    const notes=event==='ui-confirm'?[659.25,987.77]:event==='ui-back'?[523.25]:event==='ui-toggle'?[783.99,880]:[783.99];
+    notes.forEach((hz,i)=>{
+      const at=time+i*.045,osc=ctx.createOscillator(),env=ctx.createGain();hz*=pitch;
+      osc.frequency.setValueAtTime(hz*.72,at);osc.frequency.exponentialRampToValueAtTime(hz,at+.018);osc.frequency.exponentialRampToValueAtTime(hz*.94,at+.12);
+      env.gain.setValueAtTime(0,at);env.gain.linearRampToValueAtTime(.075,at+.006);env.gain.exponentialRampToValueAtTime(.00001,at+.14);
+      osc.connect(env);env.connect(bus);osc.start(at);osc.stop(at+.15);
+      osc.onended=()=>{osc.disconnect();env.disconnect();};
+      partial(ctx,bus,hz*2,at+.012,.12,.012);
+    });
+  }
   if(event==='pick'){brush(ctx,bus,time,.055,.045);partial(ctx,bus,m.hz*.7*pitch,time,.065,.035);}
   if(event==='launch'){
     const osc=ctx.createOscillator(),env=ctx.createGain();osc.type='triangle';osc.frequency.setValueAtTime(180,time);osc.frequency.exponentialRampToValueAtTime(720,time+.12);

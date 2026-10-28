@@ -25,8 +25,28 @@ function tone(type='pick',options={}){audio.play(type,options);}
 function syncAudio(){audio.setActive(!document.hidden);}
 function cancelPointer(){designer?.cancel();activePointer=null;document.querySelectorAll('[data-source]').forEach(b=>{if(b._down){b._down=null;b._dragged=true;}});board?.cancelDrag();}
 document.addEventListener('visibilitychange',()=>{if(document.hidden){clearSoundGesture();cancelPointer();audio.suspend();}else{syncAudio();}});
-document.addEventListener('pointerdown',()=>audio.unlock(),{passive:true});
+let syntheticUIClick=false;
+document.addEventListener('pointerdown',()=>{syntheticUIClick=false;audio.unlock();},{passive:true});
 document.addEventListener('keydown',()=>audio.unlock());
+// Run after the action so existing bead/reward sounds and touch click suppression take priority.
+const uiClickStarts=new WeakMap();
+document.addEventListener('click',e=>uiClickStarts.set(e,audio.sequence),true);
+document.addEventListener('click',e=>{
+ const control=e.target.closest('button,a[href],summary,input[type="checkbox"],input[type="radio"],select');
+ if(!control||control.matches(':disabled,[aria-disabled="true"],.board-hit'))return;
+ if(!e.composedPath().some(el=>el===app||el.id==='modal'))return;
+ // The designer completes touch taps with click(); navigation can also emit a native touch click.
+ if(e.isTrusted&&e.pointerType==='touch'&&syntheticUIClick)return;
+ if(!e.isTrusted)syntheticUIClick=true;
+ if(uiClickStarts.get(e)!==audio.sequence)return;
+ const sound=control.matches('[data-close],#go-home,#design-home')?'ui-back':control.matches('.primary')?'ui-confirm':control.matches('input,select,#design-move')?'ui-toggle':'ui-tap';
+ tone(sound);
+});
+let lastSliderSound=-Infinity;
+document.addEventListener('input',e=>{
+ if(!e.target.matches('input[type="range"]')||performance.now()-lastSliderSound<90)return;
+ lastSliderSound=performance.now();tone('ui-tap',{strength:.45});
+});
 function save(){try{localStorage.setItem('old-beads-pink-v1',JSON.stringify({version:1,...progress}));}catch{if(!saveWarning){saveWarning=true;toast('浏览器暂不能保存。当前仍可游玩，请尽量保持页面打开。');}}}
 function saveSession(){progress.session={level:index,state:clone(state),history:history.slice(-60),usedHint};save();}
 function toast(text){let t=$('#toast');if(!t){t=document.createElement('div');t.id='toast';t.role='status';document.body.append(t);}t.textContent=text;t.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.remove('show'),3300);}
@@ -127,7 +147,7 @@ function openModal(html,wide=false){
  clearSoundGesture();if($('#modal'))closeModal();cancelPointer();previousFocus=document.activeElement;modal=true;syncAudio();app.inert=true;const el=document.createElement('div');el.id='modal';el.className='modal-backdrop petal-modal';el.innerHTML=`<section class="modal ${wide?'wide':''}" role="dialog" aria-modal="true" aria-label="工坊小笺" tabindex="-1"><button class="modal-close icon-button" data-close aria-label="关闭窗口">${icon('close')}</button>${html}</section>`;document.body.append(el);el.querySelectorAll('[data-close]').forEach(b=>b.onclick=closeModal);el.addEventListener('keydown',e=>{if(e.key==='Tab'){const nodes=[...el.querySelectorAll('button:not([disabled]),a[href],input')].filter(b=>b.offsetParent!==null);if(!nodes.length)return;const first=nodes[0],last=nodes.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}});el.querySelector('.modal').focus();
 }
 function closeModal(){const el=$('#modal');if(!el)return;el.remove();modal=false;app.inert=false;syncAudio();if(previousFocus?.isConnected)previousFocus.focus();}
-function story(){const c=commissions[index],client=customers[c.client];openModal(`<div class="letter-layout"><img class="letter-portrait" src="${art(client.portrait)}" alt="${client.name}"><div><div class="eyebrow">${chapters[Math.floor(index/4)].label} · 委托 ${index+1}</div><h2>${c.title}</h2><p>${c.before}</p><span class="letter-sign">— ${client.name}的来信</span><button class="primary" id="accept-order">收下这份委托 ${icon('arrow')}</button></div></div>`);$('#accept-order').onclick=()=>{tone();closeModal();if(index===0&&state.moves===0){$('#instruction').textContent='第一步：选料杆 A 的粉晶，再点手链 1 的绿圈。';}};}
+function story(){const c=commissions[index],client=customers[c.client];openModal(`<div class="letter-layout"><img class="letter-portrait" src="${art(client.portrait)}" alt="${client.name}"><div><div class="eyebrow">${chapters[Math.floor(index/4)].label} · 委托 ${index+1}</div><h2>${c.title}</h2><p>${c.before}</p><span class="letter-sign">— ${client.name}的来信</span><button class="primary" id="accept-order">收下这份委托 ${icon('arrow')}</button></div></div>`);$('#accept-order').onclick=()=>{closeModal();if(index===0&&state.moves===0){$('#instruction').textContent='第一步：选料杆 A 的粉晶，再点手链 1 的绿圈。';}};}
 function help(){openModal(`<div class="eyebrow">工坊里的三件小事</div><h2>取一颗，想一步。</h2><ol class="help-list"><li><b>取珠</b><p>只能选择料杆<b>左端</b>第一颗。后面的珠子可看见，前面取走后才能用。</p></li><li><b>串入</b><p>选中珠子，再点需要它的手链。月光石底珠已穿好，你来补齐彩色配珠。顺时针从顶端开始，绿色小圈表示下一颗待补珠位。</p></li><li><b>暂存</b><p>暂时用不上，可以先放空盘。暂存珠只能串入手链，不能放回料杆。每一颗都要用完。</p></li></ol><p class="muted">不计时、不扣费。可无限撤销与重来，卡住时试试“一点灵感”。鼠标、触屏均可点选，也可拖放；键盘 Tab 选择、Enter 确认、Z 撤销、Esc 关闭、F 全屏。</p><button class="primary" data-close>我知道了</button>`);}
 function complete(delay=0){
  mode='complete';syncAudio();const firstClear=!progress.completed.includes(index),reward=firstClear?100+index*20+(usedHint?0:25):0;lastReward=reward;if(firstClear){progress.completed.push(index);progress.coins+=reward;}progress.session=null;save();
@@ -146,7 +166,7 @@ function bindSoundButton(){
   soundGestureTimer=setTimeout(()=>{soundGestureTimer=null;nextMusicFromButton();},400);
  };
 }
-function toggleSound(){progress.sound=!progress.sound;save();audio.apply();const control=$('#sound-toggle');if(control){control.checked=progress.sound;control.setAttribute('aria-checked',String(progress.sound));}if(progress.sound)tone();toast(progress.sound?'珠声已开启':'珠声已关闭');}
+function toggleSound(){progress.sound=!progress.sound;save();audio.apply();const control=$('#sound-toggle');if(control){control.checked=progress.sound;control.setAttribute('aria-checked',String(progress.sound));}if(progress.sound)tone('ui-toggle');toast(progress.sound?'珠声已开启':'珠声已关闭');}
 function refreshMusicPicker(){
  const current=$('#music-current');if(current)current.textContent=`已选：${audio.status().track}`;
  document.querySelectorAll('[data-music-track]').forEach(b=>b.setAttribute('aria-pressed',String(Number(b.dataset.musicTrack)===audio.track)));
