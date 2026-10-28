@@ -1,0 +1,27 @@
+// Numeric ids are persistent: append new jewelry without changing existing saves.
+export const COLORS = [
+ {name:'粉晶',hex:'#ef9ab2',file:'coral',family:'crystal'},
+ {name:'绿幽灵',hex:'#82cbb0',file:'jade',family:'crystal'},
+ {name:'金发晶',hex:'#ecc75f',file:'amber',family:'crystal'},
+ {name:'月光石',hex:'#dcecff',file:'pearl',family:'crystal'},
+ {name:'海蓝宝',hex:'#7dc9ee',file:'blue',family:'crystal',sea:true},
+ {name:'紫水晶',hex:'#c49fe9',file:'lilac',family:'crystal'},
+ {name:'红玛瑙',hex:'#e97186',file:'garnet',family:'natural'},
+ {name:'绿松石',hex:'#53cdbd',file:'turquoise',family:'natural',sea:true},
+ {name:'烟晶',hex:'#9aa7cd',file:'smoky',family:'crystal'},
+ {name:'黄水晶',hex:'#f4b960',file:'citrine',family:'crystal'},
+ {name:'蓝月光',hex:'#a7cefc',file:'blue-moon',family:'crystal',sea:true},
+ {name:'草莓晶',hex:'#f5a2bb',file:'strawberry',family:'crystal'},
+ {name:'冰裂白晶',hex:'#e5f3ff',file:'ice-quartz',family:'crystal'},
+ {name:'孔雀石',hex:'#45ac7c',file:'malachite',family:'natural'},
+ {name:'虎眼石',hex:'#d6a248',file:'tiger-eye',family:'natural'},
+ {name:'黑曜石',hex:'#655c90',file:'obsidian',family:'natural'},
+ {name:'贝母珠',hex:'#f7e8c8',file:'shell',family:'natural'},
+ {name:'檀木珠',hex:'#ba7747',file:'sandalwood',family:'natural'},
+ {name:'红玉髓',hex:'#f59660',file:'carnelian',family:'natural'},
+ {name:'蓝托帕石',hex:'#64bff2',file:'topaz-cut',family:'gem',sea:true},
+ {name:'爱心琉璃',hex:'#f57fa6',file:'glass-heart',family:'charm'},
+ {name:'星芒金饰',hex:'#edc85b',file:'gold-star',family:'charm'},
+ {name:'小雏菊',hex:'#fff1ba',file:'daisy',family:'charm'},
+ {name:'蝶翼琉璃',hex:'#82d9ed',file:'glass-butterfly',family:'charm',sea:true}
+].map(c=>({...c,symbol:''}));
