@@ -1,5 +1,6 @@
 import {loadWorkshop} from './design-rules.js';
 import {COLORS} from './materials.js';
+import {validMatchSession,validMatchRings,matchLevels} from './match-model.js';
 export {COLORS};
 export function createState(level) {
   return {rails:level.rails.map(a=>[...a]),orders:level.orders.map(()=>[]),buffer:Array(level.capacity).fill(null),moves:0};
@@ -46,7 +47,7 @@ export function validLevel(level) {
   return supply===demand && level.rails.every(a=>a.length>0) && level.capacity>0 && level.orders.every(a=>a.length>0);
 }
 export function loadProgress(storage) {
-  try {const p=JSON.parse(storage.getItem('old-beads-pink-v1'));if(p?.version===1&&Array.isArray(p.completed))return {completed:[...new Set(p.completed.filter(x=>Number.isInteger(x)&&x>=0&&x<12))],coins:Number.isSafeInteger(p.coins)&&p.coins>=0?p.coins:0,sound:p.sound!==false,...(typeof p.volume==='number'&&Number.isFinite(p.volume)?{volume:Math.max(0,Math.min(1,p.volume))}:{}),...(typeof p.musicVolume==='number'&&Number.isFinite(p.musicVolume)?{musicVolume:Math.max(0,Math.min(1,p.musicVolume))}:{}),...(Number.isInteger(p.musicTrack)&&p.musicTrack>=0&&p.musicTrack<6?{musicTrack:p.musicTrack}:{}),...(typeof p.music==='boolean'?{music:p.music}:{}),...(p.workshop?{workshop:loadWorkshop(p.workshop)}:{}),...(p.construction&&Number.isInteger(p.construction.built)?{construction:{built:Math.max(0,Math.min(12,p.construction.built))}}:{}),session:validSession(p.session)?p.session:null};}catch{}
+  try {const p=JSON.parse(storage.getItem('old-beads-pink-v1'));if(p?.version===1&&Array.isArray(p.completed))return {completed:[...new Set(p.completed.filter(x=>Number.isInteger(x)&&x>=0&&x<12))],coins:Number.isSafeInteger(p.coins)&&p.coins>=0?p.coins:0,sound:p.sound!==false,...(typeof p.volume==='number'&&Number.isFinite(p.volume)?{volume:Math.max(0,Math.min(1,p.volume))}:{}),...(typeof p.musicVolume==='number'&&Number.isFinite(p.musicVolume)?{musicVolume:Math.max(0,Math.min(1,p.musicVolume))}:{}),...(Number.isInteger(p.musicTrack)&&p.musicTrack>=0&&p.musicTrack<6?{musicTrack:p.musicTrack}:{}),...(typeof p.music==='boolean'?{music:p.music}:{}),...(p.workshop?{workshop:loadWorkshop(p.workshop)}:{}),...(p.construction&&Number.isInteger(p.construction.built)?{construction:{built:Math.max(0,Math.min(12,p.construction.built))}}:{}),...(Array.isArray(p.matchWorks)?{matchWorks:p.matchWorks.slice(0,12).map((r,i)=>validMatchRings(r,matchLevels[i])?r:null)}:{}),matchSession:validMatchSession(p.matchSession)?p.matchSession:null,session:validSession(p.session)?p.session:null};}catch{}
   return {completed:[],coins:0,sound:true,session:null};
 }
 export function validSession(s) {

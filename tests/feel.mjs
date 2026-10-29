@@ -1,39 +1,28 @@
 import {chromium} from 'playwright';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import {matchLevels,createMatchState,placeMatch} from '../src/match-model.js';
 const base=process.env.GAME_URL||'http://127.0.0.1:5220/';
-const browser=await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader']});
-const context=await browser.newContext({viewport:{width:1440,height:1000}}),page=await context.newPage(),errors=[];
-page.on('pageerror',e=>errors.push(String(e)));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
-const read=()=>page.evaluate(()=>JSON.parse(window.render_game_to_text()));
-const box=async selector=>{const b=await page.locator(selector).boundingBox();return {x:b.x+b.width/2,y:b.y+b.height/2};};
-const click=selector=>page.locator(selector).click();
-const settle=()=>page.waitForFunction(()=>{const f=JSON.parse(window.render_game_to_text()).feedback;return !f.dragging&&!f.flights&&!f.impacts;});
 fs.mkdirSync('artifacts',{recursive:true});
+const browser=await chromium.launch({headless:true}),errors=[];
+try{
+const context=await browser.newContext({viewport:{width:1440,height:1000}}),page=await context.newPage();
+page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
+const read=()=>page.evaluate(()=>JSON.parse(render_game_to_text()));
+const settle=()=>page.waitForFunction(()=>{const s=JSON.parse(render_game_to_text());return !s.busy&&!s.feedback.flights&&!s.feedback.impacts;});
+const click=s=>page.locator(s).click();
+const box=async s=>{const b=await page.locator(s).boundingBox();return {x:b.x+b.width/2,y:b.y+b.height/2};};
 await page.goto(base);await click('#start-btn');await click('#accept-order');
-const source=await box('[data-source="rail-0"]'),neighbor=await box('[data-source="rail-1"]'),wrong=await box('[data-target="order-1"]'),right=await box('[data-target="order-0"]');
-await page.mouse.move(source.x,source.y);await page.mouse.down();await page.mouse.move(neighbor.x,neighbor.y+12,{steps:10});
-assert.equal((await read()).feedback.dragging,true);assert.equal((await read()).state.moves,0);assert.ok((await read()).audio.events>=3,'pick plus contact with visible bead');
-await page.screenshot({path:'artifacts/feel-drag.png'});
-await page.mouse.move(wrong.x,wrong.y,{steps:8});await page.mouse.up();await settle();assert.equal((await read()).state.moves,0);
-await page.mouse.move(source.x,source.y);await page.mouse.down();await page.mouse.move(right.x,right.y,{steps:10});await page.mouse.up();
-assert.equal((await read()).state.moves,1);await page.waitForFunction(()=>JSON.parse(window.render_game_to_text()).feedback.impacts>0);
-await page.screenshot({path:'artifacts/feel-impact.png'});await settle();assert.equal((await read()).feedback.flights,0);await click('#undo-btn');
-// Cancelling a dragged bead must never commit the move or leave pointer capture stuck.
-await page.mouse.move(source.x,source.y);await page.mouse.down();await page.mouse.move(right.x-60,right.y,{steps:8});await page.keyboard.press('Escape');await page.mouse.up();await settle();assert.equal((await read()).state.moves,0);
-// Undo during a flight cancels its pending collision sound as well as its visual.
-await click('[data-source="rail-0"]');await click('[data-target="buffer-0"]');await click('#undo-btn');const events=(await read()).audio.events;
-await page.waitForTimeout(1000);assert.equal((await read()).audio.events,events);assert.equal((await read()).state.moves,0);
-// Reusing a buffer before its first flight settles must still conserve each bead.
-await click('[data-source="rail-0"]');await click('[data-target="buffer-0"]');await click('[data-source="buffer-0"]');await click('[data-target="order-0"]');
-await settle();assert.equal((await read()).state.moves,2);assert.deepEqual((await read()).state.orders[0],[0]);await click('#undo-btn');await click('#undo-btn');
-await click('#audio-settings');await page.locator('#music-toggle').uncheck();
-const slider=await page.locator('#volume-slider').boundingBox();await page.mouse.click(slider.x+slider.width*.4,slider.y+slider.height/2);
-assert.ok((await read()).audio.volume>.3&&(await read()).audio.volume<.5);await click('#sound-preview');
-await page.screenshot({path:'artifacts/feel-audio-settings.png'});await page.getByRole('button',{name:'回到工作台',exact:true}).click();
-await page.reload();await click('#start-btn');assert.equal((await read()).audio.music,false);assert.ok((await read()).audio.volume<.5);
-await click('#audio-settings');await page.locator('#sound-toggle').uncheck();const muted=(await read()).audio.events;await page.getByRole('button',{name:'回到工作台',exact:true}).click();await click('[data-source="rail-0"]');await click('[data-target="order-0"]');await settle();assert.equal((await read()).audio.events,muted);
-// Render the real audio synthesis offline: audible, bounded, distinct timbres, and quiet tails.
+const initial=(await read()).state,from=await box('[data-source="palette-2"]'),to=await box('[data-target="slot-13"]');
+await page.mouse.move(from.x,from.y);await page.mouse.down();await page.mouse.move(to.x,to.y,{steps:12});assert.equal((await read()).feedback.dragging,true);await page.screenshot({path:'artifacts/match-drag.png',fullPage:true});await page.mouse.up();
+assert.deepEqual((await read()).state,placeMatch(initial,matchLevels[0],{type:'palette',index:2},{type:'slot',index:13}).state);await settle();await click('#undo-btn');assert.deepEqual((await read()).state,initial);
+await page.mouse.move(from.x,from.y);await page.mouse.down();await page.mouse.move(to.x,to.y,{steps:8});await page.keyboard.press('Escape');await page.mouse.up();await settle();assert.deepEqual((await read()).state,initial);
+await click('[data-source="palette-2"]');await click('[data-target="slot-13"]');await click('#undo-btn');const eventCount=(await read()).audio.events;await page.waitForTimeout(1000);assert.equal((await read()).audio.events,eventCount);assert.deepEqual((await read()).state,initial);
+// Normal-motion circular mixed-shade clear, animated refill and undo use a valid saved position.
+const state=createMatchState(matchLevels[11]);state.rings[0]=[0,6,1,2,3,4,5,1];
+await page.evaluate(save=>localStorage.setItem('old-beads-pink-v1',JSON.stringify(save)),{version:1,completed:[],coins:0,matchSession:{mode:'match-v1',level:11,state,history:[]}});
+await page.reload();await click('#start-btn');await page.locator('[data-target="slot-0"]').waitFor();await click('[data-source="palette-0"]');await click('[data-target="slot-2"]');assert.equal((await read()).state.collected[0],2);await page.waitForTimeout(360);await page.screenshot({path:'artifacts/match-clearing.png',fullPage:true});await settle();assert.deepEqual((await read()).state,placeMatch(state,matchLevels[11],{type:'palette',index:0},{type:'slot',index:2}).state);await page.screenshot({path:'artifacts/match-refilled.png',fullPage:true});await click('#undo-btn');assert.deepEqual((await read()).state,state);
+await click('#audio-settings');await page.locator('#music-toggle').uncheck();await page.locator('#volume-slider').fill('40');await page.locator('#sound-toggle').uncheck();await click('#modal .modal-close');const muted=(await read()).audio.events;await click('[data-source="palette-2"]');await click('[data-target="slot-14"]');await settle();assert.equal((await read()).audio.events,muted);
 const sourceAudio=fs.readFileSync('src/audio.js','utf8');
 const rendered=await page.evaluate(async code=>{
   const url=URL.createObjectURL(new Blob([code],{type:'text/javascript'})),{synthesize,MATERIALS}=await import(url);URL.revokeObjectURL(url);
@@ -55,18 +44,12 @@ const length=rendered.channels[0].length,wav=Buffer.alloc(44+length*4);
 wav.write('RIFF',0);wav.writeUInt32LE(wav.length-8,4);wav.write('WAVEfmt ',8);wav.writeUInt32LE(16,16);wav.writeUInt16LE(1,20);wav.writeUInt16LE(2,22);wav.writeUInt32LE(44100,24);wav.writeUInt32LE(176400,28);wav.writeUInt16LE(4,32);wav.writeUInt16LE(16,34);wav.write('data',36);wav.writeUInt32LE(length*4,40);
 for(let i=0;i<length;i++)for(let c=0;c<2;c++)wav.writeInt16LE(Math.round(Math.max(-1,Math.min(1,rendered.channels[c][i]))*32767),44+i*4+c*2);
 fs.writeFileSync('artifacts/bead-sound-demo.wav',wav);fs.writeFileSync('artifacts/audio-check.json',JSON.stringify(rendered.profiles,null,2));
-const mobile=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true}),mp=await mobile.newPage();mp.on('pageerror',e=>errors.push(String(e)));
-await mp.goto(base);await mp.locator('#start-btn').tap();await mp.locator('#accept-order').tap();
-const cdp=await mobile.newCDPSession(mp),a=await mp.locator('[data-source="rail-0"]').boundingBox(),b=await mp.locator('[data-target="order-0"]').boundingBox();
-await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:a.x+a.width/2,y:a.y+a.height/2,id:1}]});
-await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:b.x+b.width/2,y:b.y+b.height/2,id:1}]});
-assert.equal(await mp.evaluate(()=>JSON.parse(window.render_game_to_text()).feedback.dragging),true);await mp.screenshot({path:'artifacts/feel-touch.png',fullPage:true});
-await cdp.send('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]});await mp.waitForTimeout(600);assert.equal(await mp.evaluate(()=>JSON.parse(window.render_game_to_text()).state.moves),0);
-const first={x:a.x+a.width/2,y:a.y+a.height/2,id:1},second={x:a.x+a.width/2,y:a.y+a.height/2+42,id:2},end={x:b.x+b.width/2,y:b.y+b.height/2,id:1};
-await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[first]});await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[first,second]});
-await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[end,second]});await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[end]});await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
-assert.equal(await mp.evaluate(()=>JSON.parse(window.render_game_to_text()).state.moves),1);await mp.locator('#undo-btn').tap();
-await mp.locator('[data-source="rail-0"]').tap();await mp.locator('[data-target="order-0"]').tap();assert.equal(await mp.evaluate(()=>JSON.parse(window.render_game_to_text()).state.moves),1);
-const reduced=await browser.newContext({reducedMotion:'reduce'}),rp=await reduced.newPage();rp.on('pageerror',e=>errors.push(String(e)));
-await rp.goto(base);await rp.locator('#start-btn').click();await rp.locator('#accept-order').click();await rp.locator('[data-source="rail-0"]').click();await rp.locator('[data-target="order-0"]').click();assert.equal(await rp.evaluate(()=>JSON.parse(window.render_game_to_text()).feedback.flights),0);
-await browser.close();assert.deepEqual(errors,[]);console.log('PASS: live bead contact, drag rejection, timed landing, cancellation, rapid input, mute and volume persistence, touch cancel, reduced motion; 24 audible distinct unclipped material profiles and launch sound.');
+
+const mobile=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:2}),mp=await mobile.newPage();mp.on('pageerror',e=>errors.push(e.message));await mp.goto(base);await mp.locator('#start-btn').tap();await mp.locator('#accept-order').tap();
+await mp.locator('#board').scrollIntoViewIfNeeded();const a=await mp.locator('[data-source="palette-2"]').boundingBox(),b=await mp.locator('[data-target="slot-11"]').boundingBox(),touch=await mobile.newCDPSession(mp),start={x:a.x+a.width/2,y:a.y+a.height/2},end={x:b.x+b.width/2,y:b.y+b.height/2};
+await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[start]});for(let i=1;i<=8;i++)await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:start.x+(end.x-start.x)*i/8,y:start.y+(end.y-start.y)*i/8}]});assert.equal(await mp.evaluate(()=>JSON.parse(render_game_to_text()).feedback.dragging),true);await touch.send('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]});await mp.waitForTimeout(500);assert.equal(await mp.evaluate(()=>JSON.parse(render_game_to_text()).state.moves),0);
+await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[start]});for(let i=1;i<=8;i++)await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:start.x+(end.x-start.x)*i/8,y:start.y+(end.y-start.y)*i/8}]});await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});assert.equal(await mp.evaluate(()=>JSON.parse(render_game_to_text()).state.moves),1);await mp.waitForTimeout(1000);await mp.locator('#undo-btn').tap();await mp.waitForFunction(()=>JSON.parse(render_game_to_text()).state.moves===0);
+await mp.setViewportSize({width:900,height:650});await mp.waitForTimeout(150);await mp.locator('[data-source="palette-1"]').tap();await mp.locator('[data-target="slot-15"]').tap();assert.equal(await mp.evaluate(()=>JSON.parse(render_game_to_text()).state.moves),1);await mp.waitForTimeout(950);
+await mp.evaluate(()=>{const gl=document.querySelector('canvas').getContext('webgl2'),ext=gl.getExtension('WEBGL_lose_context');ext.loseContext();setTimeout(()=>ext.restoreContext(),150);});await mp.getByText('工作台已恢复。',{exact:true}).waitFor();assert.equal(await mp.evaluate(()=>JSON.parse(render_game_to_text()).state.moves),1);
+assert.deepEqual(errors,[]);console.log('PASS: mouse/touch drag, cancel, arbitrary replacement, mixed clear animation/refill, undo during flight, mute, material audio, rotation and WebGL restore.');
+}finally{await browser.close();}

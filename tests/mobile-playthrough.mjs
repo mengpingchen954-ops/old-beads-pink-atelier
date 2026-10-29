@@ -1,59 +1,30 @@
 import {chromium,webkit} from 'playwright';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {levels} from '../src/levels.js';
-import {createState,solve} from '../src/model.js';
+import {matchLevels,createMatchState,placeMatch} from '../src/match-model.js';
 const base=process.env.GAME_URL||'http://127.0.0.1:5220/';
-fs.mkdirSync('artifacts',{recursive:true});
-const errors=[];
+fs.mkdirSync('artifacts',{recursive:true});const errors=[];
 for(const engine of [chromium,webkit]){
- const browser=await engine.launch({headless:true});
- try{
-  for(const [width,height] of [[320,568],[360,640],[390,844],[430,932],[700,900],[844,390]]){
-   const tag=`${engine.name()}-${width}`,context=await browser.newContext({viewport:{width,height},isMobile:true,hasTouch:true,deviceScaleFactor:2});
-   const page=await context.newPage();page.on('pageerror',e=>errors.push(`${tag}: ${e.message}`));page.on('console',m=>{if(m.type()==='error')errors.push(`${tag}: ${m.text()}`);});page.on('response',r=>{if(r.status()>=400)errors.push(`${tag}: ${r.status()} ${r.url()}`);});
-   const read=()=>page.evaluate(()=>JSON.parse(render_game_to_text()));
-   const tap=s=>page.locator(s).tap();
-   async function fits(){assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`${tag}: page width`);if(await page.locator('#modal').count())assert.ok(await page.locator('.modal').evaluate(e=>e.scrollWidth<=e.clientWidth),`${tag}: modal width`);}
-   async function targets(){
-    const boxes=await page.locator('.board-hit').evaluateAll(es=>es.map(e=>e.getBoundingClientRect().toJSON()));
-    for(const b of boxes)assert.ok(b.width>=43.9&&b.height>=43.9,`${tag}: touch target ${b.width}x${b.height}`);
-    const rows=await page.locator('[data-source^="rail-"]').evaluateAll(es=>es.map(e=>e.getBoundingClientRect().toJSON()));
-    for(let i=0;i<rows.length;i++)for(let j=i+1;j<rows.length;j++)assert.ok(rows[i].right<=rows[j].left+.1||rows[j].right<=rows[i].left+.1||rows[i].bottom<=rows[j].top+.1||rows[j].bottom<=rows[i].top+.1,`${tag}: material targets must not overlap`);
-    if(width<=760&&rows.length){const orders=await page.locator('[data-target^="order-"]').all();const order=await orders[0].boundingBox(),board=await page.locator('#board').boundingBox();assert.ok(order.width>board.width*.46,'bracelets dominate the width');assert.ok(Math.max(...rows.map(b=>b.bottom))-Math.min(...rows.map(b=>b.top))<order.height*.7,'material rows occupy less height than the bracelets');}
-   }
-   await page.goto(base);await page.locator('#start-btn').waitFor();await fits();
-   if(width<=760)assert.ok((await page.locator('#start-btn').boundingBox()).y+65<=height,`${tag}: start visible without scrolling`);
-   await tap('#start-btn');await tap('#accept-order');assert.equal(await page.evaluate(()=>scrollY),0,`${tag}: start at top`);await targets();
-   await tap('[data-source="rail-0"]');await tap('[data-target="order-0"]');assert.equal((await read()).state.moves,1);
-   await tap('#undo-btn');assert.equal((await read()).state.moves,0);
-   await page.locator('#sound-btn').scrollIntoViewIfNeeded();const song=(await read()).audio.track;
-   await tap('#sound-btn');await page.waitForTimeout(480);assert.notEqual((await read()).audio.track,song);
-   const next=(await read()).audio.track;await tap('#sound-btn');await tap('#sound-btn');await page.locator('#volume-slider').waitFor();await page.waitForTimeout(450);assert.equal((await read()).audio.track,next);await fits();
-   const scrollBefore=await page.evaluate(()=>scrollY);
-   await page.locator('#volume-slider').scrollIntoViewIfNeeded();const volume=await page.locator('#volume-slider').boundingBox();await page.touchscreen.tap(volume.x+volume.width*.3,volume.y+volume.height/2);assert.ok((await read()).audio.volume<.5,`${tag}: touch volume`);
-   await tap('[data-music-track="5"]');assert.equal((await read()).audio.track,'治愈时光');
-   await page.locator('#music-toggle').uncheck();assert.equal((await read()).audio.playing,false);await page.locator('#music-toggle').check();
-   await page.getByRole('button',{name:'回到工作台',exact:true}).tap();assert.equal((await read()).modal,false);assert.equal(await page.evaluate(()=>scrollY),scrollBefore,`${tag}: modal preserves page scroll`);
-   if(width===320){
-    for(const a of solve((await read()).state,levels[0])){await tap(`[data-source="${a.source.type}-${a.source.index}"]`);await tap(`[data-target="${a.target.type}-${a.target.index}"]`);}
-    await page.locator('#reward-home').waitFor();await page.waitForTimeout(950);await fits();assert.equal(await page.locator('.reward-bracelets .bracelet').count(),2);await page.screenshot({path:`artifacts/mobile-reward-${tag}.png`,fullPage:true});await tap('#reward-home');assert.equal(await page.evaluate(()=>scrollY),0,`${tag}: home at top`);
-    await tap('#build-home');await tap('#confirm-build');assert.equal((await read()).construction.repaired,1);
-    await tap('#collection-home');await fits();await tap('[data-level="0"]');await fits();await tap('#back-gallery');await tap('#modal .modal-close');
-   }else {await tap('#go-home');assert.equal(await page.evaluate(()=>scrollY),0,`${tag}: home at top`);}
-   await tap('#design-home-entry');await page.waitForFunction(()=>JSON.parse(render_game_to_text()).design);await fits();await targets();
-   await tap('[data-filter="gem"]');await tap('[data-filter="all"]');assert.equal((await read()).design.selectedColor,4,'filtering must not accidentally select a material under the finger');await tap('[data-slot="0"]');assert.equal((await read()).design.slots[0],4);await tap('#design-undo');assert.equal((await read()).design.slots[0],null);
-   await page.screenshot({path:`artifacts/mobile-designer-${tag}.png`,fullPage:true});await tap('#design-home');
-   // A valid late-game save exercises all four material rows and filled gallery cells.
-   await page.evaluate(save=>localStorage.setItem('old-beads-pink-v1',JSON.stringify(save)),{version:1,completed:Array.from({length:11},(_,i)=>i),coins:1000,sound:true,session:{level:11,state:createState(levels[11]),history:[],usedHint:false}});
-   await page.reload();await tap('#collection-home');await fits();await page.screenshot({path:`artifacts/mobile-collection-${tag}.png`,fullPage:true});await tap('#modal .modal-close');
-   await tap('#start-btn');await page.locator('[data-source="rail-0"]').waitFor();assert.equal((await read()).level,12);await targets();await fits();await page.evaluate(()=>Promise.all([...document.images].map(img=>img.decode())));await page.screenshot({path:`artifacts/mobile-four-rails-${tag}.png`,fullPage:true});
-   const action=solve((await read()).state,levels[11])[0];await tap(`[data-source="${action.source.type}-${action.source.index}"]`);await tap(`[data-target="${action.target.type}-${action.target.index}"]`);assert.equal((await read()).state.moves,1);
-   await page.setViewportSize({width:height,height:width});await page.waitForTimeout(100);assert.equal((await read()).state.moves,1);await fits();
-   await page.reload();await tap('#start-btn');assert.equal((await read()).state.moves,1,`${tag}: progress survives rotation and reload`);
-   await context.close();console.log(`PASS: ${tag} touch, layout, sound gestures, settings, designer, four rails, gallery, rotation/save`);
-  }
-  if(engine===webkit)console.log('WebKit WinCairo verified layout, WebGL, MP3 and touch; this runtime does not expose AudioContext, so synthesized sound requires the Chromium check and real-device follow-up.');
+ const browser=await engine.launch({headless:true});try{
+ for(const [width,height] of [[320,568],[360,640],[390,844],[430,932],[700,900],[844,390]]){
+  const tag=`${engine.name()}-${width}`,context=await browser.newContext({viewport:{width,height},isMobile:true,hasTouch:true,deviceScaleFactor:2,reducedMotion:'reduce'}),page=await context.newPage();
+  page.on('pageerror',e=>errors.push(`${tag}: ${e.message}`));page.on('console',m=>{if(m.type()==='error')errors.push(`${tag}: ${m.text()}`);});page.on('response',r=>{if(r.status()>=400)errors.push(`${tag}: ${r.status()} ${r.url()}`);});
+  const read=()=>page.evaluate(()=>JSON.parse(render_game_to_text())),tap=s=>page.locator(s).tap();
+  const fits=async()=>{assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));if(await page.locator('.modal').count())assert.ok(await page.locator('.modal').evaluate(e=>e.scrollWidth<=e.clientWidth));};
+  async function targets(){assert.equal(await page.locator('[data-target]').count(),16);assert.equal(await page.locator('#match-materials button').count(),(await read()).palette.length);assert.ok(await page.locator('.board-hit,#match-materials button').evaluateAll(es=>es.every(e=>{const b=e.getBoundingClientRect();return b.width>=43.9&&b.height>=43.9;})));await page.locator('#board').scrollIntoViewIfNeeded();assert.ok(await page.locator('.board-hit').evaluateAll(es=>es.every(e=>{const b=e.getBoundingClientRect();return document.elementFromPoint(b.x+b.width/2,b.y+b.height/2)===e;})),'each bead center selects its own slot');}
+  await page.goto(base);await tap('#start-btn');await tap('#accept-order');await fits();await targets();
+  const initial=(await read()).state;await tap('[data-source="palette-2"]');await tap('[data-target="slot-14"]');assert.deepEqual((await read()).state,placeMatch(initial,matchLevels[0],{type:'palette',index:2},{type:'slot',index:14}).state);await tap('#undo-btn');assert.deepEqual((await read()).state,initial);
+  for(let i=0;i<16;i++){await tap('[data-source="palette-1"]');await tap(`[data-target="slot-${i}"]`);assert.equal((await read()).state.moves,1);await tap('#undo-btn');}
+  await page.locator('#sound-btn').scrollIntoViewIfNeeded();const song=(await read()).audio.track;await tap('#sound-btn');await page.waitForTimeout(470);assert.notEqual((await read()).audio.track,song);const next=(await read()).audio.track;await tap('#sound-btn');await tap('#sound-btn');await page.locator('#volume-slider').waitFor();assert.equal((await read()).audio.track,next);await fits();await page.locator('#music-volume-slider').fill('24');assert.equal((await read()).audio.musicVolume,.24);await tap('#modal .modal-close');
+  await tap('#go-home');await tap('#design-home-entry');await page.waitForFunction(()=>JSON.parse(render_game_to_text()).design);await tap('[data-filter="gem"]');await tap('[data-filter="all"]');assert.equal((await read()).design.selectedColor,4);await tap('[data-slot="0"]');assert.equal((await read()).design.slots[0],4);await tap('#design-home');
+  const state=createMatchState(matchLevels[11]);state.rings[0]=[0,6,1,2,3,4,5,1];
+  await page.evaluate(save=>localStorage.setItem('old-beads-pink-v1',JSON.stringify(save)),{version:1,completed:Array.from({length:11},(_,i)=>i),coins:1000,sound:true,matchSession:{mode:'match-v1',level:11,state,history:[]}});
+  await page.reload();await tap('#start-btn');await page.locator('[data-target="slot-0"]').waitFor();await page.locator('#board').scrollIntoViewIfNeeded();await fits();await targets();await page.evaluate(()=>Promise.all([...document.images].map(i=>i.decode())));await page.screenshot({path:`artifacts/match-mobile-${tag}.png`,fullPage:true});
+  await tap('[data-source="palette-0"]');await tap('[data-target="slot-2"]');assert.equal((await read()).state.collected[0],2);assert.equal((await read()).state.collected[6],1);assert.deepEqual((await read()).state,placeMatch(state,matchLevels[11],{type:'palette',index:0},{type:'slot',index:2}).state);
+  await tap('#undo-btn');assert.deepEqual((await read()).state,state);await tap('[data-source="ring-0"]');await tap('[data-target="slot-13"]');const saved=(await read()).state;assert.equal(saved.moves,1);
+  await page.setViewportSize({width:height,height:width});await page.waitForTimeout(150);await fits();await page.reload();await tap('#start-btn');await page.locator('[data-target="slot-0"]').waitFor();assert.deepEqual((await read()).state,saved);await tap('#undo-btn');assert.deepEqual((await read()).state,state);
+  await context.close();console.log(`PASS: ${tag}, all 16 slots, any material, mixed clear/count/refill, swap/undo, audio, designer, rotation/save.`);
+ }
  }finally{await browser.close();}
 }
 assert.deepEqual(errors,[]);

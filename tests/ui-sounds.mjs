@@ -18,7 +18,7 @@ try{
   await audible('#build-home');await audible('#confirm-build');await page.locator('#accept-order').waitFor();await audible('#accept-order');
   await audible('#help-btn');await audible('#modal .modal-close');await audible('#hint-btn');
   // The bead retains its own sound instead of layering a menu click over it.
-  await audible('[data-source="rail-0"]');await click('[data-target="order-0"]');
+  await audible('[data-source="palette-0"]');await click('[data-target="slot-0"]');
   await page.waitForFunction(()=>{const f=JSON.parse(render_game_to_text()).feedback;return !f.flights&&!f.impacts;});await audible('#undo-btn');
   await audible('#audio-settings');
   await page.locator('#music-toggle').uncheck();

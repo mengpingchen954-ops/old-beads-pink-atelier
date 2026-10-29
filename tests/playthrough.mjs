@@ -1,90 +1,30 @@
 import {chromium} from 'playwright';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {levels} from '../src/levels.js';
-import {solve,move,clone,actions,won,createState} from '../src/model.js';
+import {matchLevels,placeMatch,matchWon,createMatchState} from '../src/match-model.js';
 const base=process.env.GAME_URL||'http://127.0.0.1:5220/';
-fs.mkdirSync('artifacts',{recursive:true});
-const browser=await chromium.launch({headless:true});
-const context=await browser.newContext({viewport:{width:1440,height:1000}}),page=await context.newPage(),errors=[];
-page.on('pageerror',e=>errors.push(String(e)));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
-const read=()=>page.evaluate(()=>JSON.parse(window.render_game_to_text()));
-async function perform(a){await page.locator(`[data-source="${a.source.type}-${a.source.index}"]`).click();await page.locator(`[data-target="${a.target.type}-${a.target.index}"]`).click();}
-await page.goto(base);await page.locator('#start-btn').waitFor();await page.screenshot({path:'artifacts/home-desktop.png',fullPage:true});
-await page.locator('#start-btn').click();await page.locator('#accept-order').click();
-async function assertBraceletLayout(p){
- const boardBox=await p.locator('#board').boundingBox();
- const orders=await p.locator('[data-target^="order-"]').all();
- const sources=await p.locator('[data-source^="rail-"],[data-target^="buffer-"]').all();
- const orderBoxes=await Promise.all(orders.map(el=>el.boundingBox())),sourceBoxes=await Promise.all(sources.map(el=>el.boundingBox()));
- for(const b of orderBoxes){assert.ok(b.width>boardBox.width*.34,'bracelets are the large visual target');assert.ok(b.y+b.height<Math.min(...sourceBoxes.map(a=>a.y)),'bracelets must be above every material source');assert.ok(b.x>=boardBox.x&&b.x+b.width<=boardBox.x+boardBox.width,'bracelets remain inside the board');}
- assert.ok(orderBoxes[0].x+orderBoxes[0].width<orderBoxes[1].x,'the two bracelet targets must not overlap');
-}
-await assertBraceletLayout(page);
-await page.locator('[data-source="rail-0"]').click();await page.locator('[data-target="order-1"]').click();assert.equal((await read()).state.moves,0);
-await page.locator('[data-target="buffer-0"]').click();assert.equal((await read()).state.buffer[0],0);
-await page.locator('[data-source="buffer-0"]').click();await page.locator('[data-target="order-0"]').click();assert.equal((await read()).state.orders[0][0],0);
-await page.locator('#undo-btn').click();await page.keyboard.press('z');assert.deepEqual((await read()).state,createState(levels[0]));
-// Actual pointer drag must transfer exactly once, and undo must restore the whole move.
-const s=await page.locator('[data-source="rail-0"]').boundingBox(),t=await page.locator('[data-target="order-0"]').boundingBox();
-await page.mouse.move(s.x+s.width/2,s.y+s.height/2);await page.mouse.down();await page.mouse.move(t.x+t.width*.85,t.y+t.height/2,{steps:8});await page.mouse.up();assert.equal((await read()).state.moves,1);await page.locator('#undo-btn').click();
-await page.locator('[data-source="rail-0"]').press('Enter');await page.locator('[data-target="order-0"]').press('Enter');assert.equal((await read()).state.moves,1);await page.keyboard.press('z');assert.deepEqual((await read()).state,createState(levels[0]));
-await page.locator('#help-btn').click();await page.keyboard.press('Escape');assert.equal((await read()).modal,false);
-await page.locator('#audio-settings').click();await page.locator('#sound-toggle').uncheck();assert.equal((await read()).audio.enabled,false);await page.getByRole('button',{name:'回到工作台',exact:true}).click();
-await page.screenshot({path:'artifacts/play-desktop.png',fullPage:true});
-for(let i=0;i<12;i++){
- let info=await read();assert.equal(info.level,i+1);
- if(i===1){
-  const first=solve(info.state,levels[i])[0];await perform(first);const saved=(await read()).state;
-  await page.reload();await page.locator('#start-btn').click();assert.deepEqual((await read()).state,saved);await page.locator('#undo-btn').click();assert.deepEqual((await read()).state,createState(levels[i]));
-  // Exercise an actual dead end, then undo and restart.
-  const seen=new Set();function blocked(s,path=[]){if(path.length>14)return null;const key=JSON.stringify([s.rails,s.orders,s.buffer]);if(seen.has(key))return null;seen.add(key);const aa=actions(s,levels[i]);if(!aa.length&&!won(s,levels[i]))return path;for(const a of aa){const p=blocked(move(s,levels[i],a.source,a.target),[...path,a]);if(p)return p;}return null;}
-  const bad=blocked(createState(levels[i]));if(bad){for(const a of bad)await perform(a);assert.match(await page.locator('#instruction').textContent(),/没有可走/);await page.screenshot({path:'artifacts/blocked.png',fullPage:true});await page.locator('#undo-btn').click();assert.ok(actions((await read()).state,levels[i]).length);}
-  await page.locator('#restart-btn').click();await page.locator('#confirm-reset').click();
-  await page.locator('#hint-btn').click();assert.ok((await read()).hint);await page.locator('#undo-btn').isDisabled();
+fs.mkdirSync('artifacts',{recursive:true});const browser=await chromium.launch({headless:true}),errors=[];
+try{
+ const page=await browser.newPage({viewport:{width:1440,height:1000},reducedMotion:'reduce'});
+ page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});page.on('response',r=>{if(r.status()>=400)errors.push(`${r.status()} ${r.url()}`);});
+ const read=()=>page.evaluate(()=>JSON.parse(render_game_to_text()));
+ async function act(color,index){const before=(await read()).state,expected=placeMatch(before,matchLevels[(await read()).level-1],{type:'palette',index:color},{type:'slot',index});await page.locator(`[data-source="palette-${color}"]`).click();await page.locator(`[data-target="slot-${index}"]`).click();assert.deepEqual((await read()).state,expected.state);}
+ await page.goto(base);await page.locator('#start-btn').click();await page.locator('#accept-order').click();assert.equal(await page.locator('[data-target]').count(),16);
+ const initial=(await read()).state;await act(2,14);await page.locator('#undo-btn').click();assert.deepEqual((await read()).state,initial);
+ await page.locator('[data-source="palette-1"]').press('Enter');await page.locator('[data-target="slot-11"]').press('Enter');assert.equal((await read()).state.moves,1);await page.keyboard.press('z');assert.deepEqual((await read()).state,initial);
+ await page.locator('#hint-btn').click();assert.ok((await read()).hint);await page.locator('#help-btn').click();assert.match(await page.locator('.help-list').innerText(),/首尾相邻/);await page.keyboard.press('Escape');
+ for(let level=0;level<12;level++){
+  assert.equal((await read()).level,level+1);const spec=matchLevels[level];
+  if(level===3||level===11){await page.evaluate(()=>Promise.all([...document.images].map(i=>i.decode())));await page.screenshot({path:`artifacts/match-level-${level+1}.png`,fullPage:true});}
+  if(level===1){await act(1,13);const saved=(await read()).state;await page.reload();await page.locator('#start-btn').click();await page.locator('[data-target="slot-0"]').waitFor();assert.deepEqual((await read()).state,saved);await page.locator('#undo-btn').click();assert.deepEqual((await read()).state,createMatchState(spec));}
+  let guard=0;while(!matchWon((await read()).state,spec)){assert.ok(++guard<160);const state=(await read()).state,goal=spec.goals.find(g=>state.collected[g.color]<g.count);for(let slot=0;slot<3&&!matchWon((await read()).state,spec);slot++)await act(goal.color,slot);}
+  const info=await read();assert.equal(info.mode,'complete');assert.ok(info.completed.includes(level));await page.locator('#next-order').waitFor();assert.match(await page.locator('.match-reward-summary').innerText(),/✓/);assert.equal(await page.locator('.reward-bracelets img').count(),16);
+  if(level===0||level===11)await page.screenshot({path:`artifacts/match-reward-${level+1}.png`,fullPage:true});
+  await page.locator('#next-order').click();if(level<11)await page.locator('#accept-order').click();console.log('PASS collection level',level+1);
  }
- info=await read();const path=solve(info.state,levels[i]);assert.ok(path);
- const coinsBefore=info.coins;
- for(const a of path)await perform(a);
- const cleared=await read();assert.equal(cleared.mode,'complete');assert.ok(cleared.completed.includes(i));assert.ok(cleared.coins>coinsBefore);assert.match(await page.locator('.coin-settlement').innerText(),/\+\d+/);assert.match(await page.locator('.coin-total').innerText(),/累计金币\s+\d+/);
- await page.locator('#next-order').waitFor();
- if(i===3||i===11)await page.screenshot({path:`artifacts/reward-${i+1}.png`,fullPage:true});
- if(i<11){await page.locator('#next-order').click();await page.locator('#accept-order').click();}
-}
-await page.locator('#next-order').click();assert.equal((await read()).completed.length,12);await page.screenshot({path:'artifacts/collection.png',fullPage:true});
-await page.getByRole('button',{name:'关闭窗口'}).click();await page.reload();await page.locator('#collection-home').click();assert.equal(await page.locator('.gallery-item.done').count(),12);
-// Exercise all construction resources through the public UI, including unspent-star persistence.
-await page.getByRole('button',{name:'关闭窗口'}).click();
-assert.equal((await read()).construction.available,12);
-await page.reload();assert.equal((await read()).construction.available,12);
-for(let i=0;i<12;i++){
- await page.locator('#build-home').click();
- if(i===0)await page.screenshot({path:'artifacts/build-preview.png',fullPage:true});
- await page.locator('#confirm-build').click();
- assert.equal((await read()).construction.repaired,i+1);
- assert.equal((await read()).construction.available,11-i);
- if(i===3||i===7)await page.locator('#visit-area').click();
- if(i===3||i===7||i===11)await page.screenshot({path:`artifacts/built-area-${i+1}.png`,fullPage:true});
-}
-assert.equal(await page.locator('#build-home').isDisabled(),true);
-await page.reload();assert.equal((await read()).construction.repaired,12);assert.equal((await read()).construction.available,0);
-assert.equal((await read()).construction.areas.filter(a=>a.unlocked).length,3);
-const mobile=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:2}),mp=await mobile.newPage();
-mp.on('pageerror',e=>errors.push(String(e)));mp.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
-await mp.goto(base);await mp.locator('#start-btn').waitFor();await mp.screenshot({path:'artifacts/home-mobile.png',fullPage:true});await mp.locator('#start-btn').tap();await mp.locator('#accept-order').tap();
-await assertBraceletLayout(mp);
-const touchSource=await mp.locator('[data-source="rail-0"]').boundingBox(),touchTarget=await mp.locator('[data-target="order-0"]').boundingBox(),touch=await mobile.newCDPSession(mp);
-const touchFrom={x:touchSource.x+touchSource.width/2,y:touchSource.y+touchSource.height/2},touchTo={x:touchTarget.x+touchTarget.width*.85,y:touchTarget.y+touchTarget.height/2};
-await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[touchFrom]});
-for(let i=1;i<=8;i++)await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:touchFrom.x+(touchTo.x-touchFrom.x)*i/8,y:touchFrom.y+(touchTo.y-touchFrom.y)*i/8}]});
-await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});assert.equal((await mp.evaluate(()=>JSON.parse(render_game_to_text()))).state.moves,1);await mp.waitForFunction(()=>JSON.parse(render_game_to_text()).feedback.flights===0);await mp.locator('#undo-btn').tap();await mp.waitForFunction(()=>JSON.parse(render_game_to_text()).state.moves===0);
-const box=await mp.locator('[data-source="rail-0"]').boundingBox();assert.ok(box.width>=40,`mobile target ${box.width}`);
-await mp.locator('[data-source="rail-0"]').tap();await mp.locator('[data-target="buffer-0"]').tap();
-assert.equal(await mp.evaluate(()=>JSON.parse(window.render_game_to_text()).state.moves),1);
-await mp.waitForTimeout(350);await mp.screenshot({path:'artifacts/play-mobile.png',fullPage:true});
-assert.equal(await mp.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
-await mp.setViewportSize({width:900,height:650});assert.equal(await mp.evaluate(()=>JSON.parse(window.render_game_to_text()).state.moves),1);await mp.locator('[data-source="buffer-0"]').click();await mp.locator('[data-target="order-0"]').click();assert.equal(await mp.evaluate(()=>JSON.parse(window.render_game_to_text()).state.moves),2);
-await mp.reload();await mp.locator('#start-btn').click();assert.equal(await mp.evaluate(()=>JSON.parse(window.render_game_to_text()).state.moves),2);
-await mp.evaluate(()=>{const gl=document.querySelector('canvas').getContext('webgl2'),extension=gl.getExtension('WEBGL_lose_context');extension.loseContext();setTimeout(()=>extension.restoreContext(),150);});
-await mp.getByText('工作台已恢复。',{exact:true}).waitFor();assert.equal(await mp.evaluate(()=>JSON.parse(window.render_game_to_text()).state.moves),2);
-await browser.close();assert.deepEqual(errors,[]);console.log('PASS: 12 full commissions, ending, collection, pointer drag, tap, undo, hint, blocked recovery, restart, reload save and responsive resize; no browser errors.');
+ assert.equal((await read()).completed.length,12);await page.locator('#modal .modal-close').click();const total=(await read()).coins;assert.equal((await read()).construction.available,12);
+ await page.reload();assert.equal((await read()).coins,total);await page.locator('#collection-home').click();assert.equal(await page.locator('.gallery-item.done').count(),12);assert.equal(await page.locator('[data-level="0"] img').count(),8);await page.locator('#modal .modal-close').click();
+ for(let i=0;i<12;i++){await page.locator('#build-home').click();await page.locator('#confirm-build').click();assert.equal((await read()).construction.repaired,i+1);if(i===3||i===7)await page.locator('#visit-area').click();}
+ assert.equal((await read()).construction.available,0);await page.reload();assert.equal((await read()).construction.repaired,12);assert.deepEqual(errors,[]);
+ console.log('PASS: all 12 collection levels through real UI, keyboard, undo, hint, refill, save/resume, actual bracelet gallery and construction rewards.');
+}finally{await browser.close();}

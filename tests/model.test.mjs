@@ -22,7 +22,7 @@ test('blocked states can be recognized, and a saved snapshot remains solvable',(
  assert.ok(found,'at least one real blocking situation should exist');
 });
 test('corrupt progress is ignored; completed indices are bounded and deduplicated',()=>{
- const storage=value=>({getItem:()=>value});assert.deepEqual(loadProgress(storage('broken')).completed,[]);assert.deepEqual(loadProgress(storage(JSON.stringify({version:1,completed:[0,0,-1,99,1],sound:false}))),{completed:[0,1],coins:0,sound:false,session:null});assert.equal(loadProgress({getItem:()=>{throw Error();}}).session,null);
+ const storage=value=>({getItem:()=>value});assert.deepEqual(loadProgress(storage('broken')).completed,[]);assert.deepEqual(loadProgress(storage(JSON.stringify({version:1,completed:[0,0,-1,99,1],sound:false}))),{completed:[0,1],coins:0,sound:false,matchSession:null,session:null});assert.equal(loadProgress({getItem:()=>{throw Error();}}).session,null);
 });
 test('coin balance is backward compatible and only accepts non-negative integers',()=>{
  const storage=value=>({getItem:()=>value});

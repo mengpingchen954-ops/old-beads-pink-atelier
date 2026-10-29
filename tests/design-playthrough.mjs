@@ -11,7 +11,7 @@ try{for(const mobile of [false,true]){
  const read=()=>page.evaluate(()=>JSON.parse(window.render_game_to_text()));
  const click=async selector=>mobile?page.locator(selector).tap():page.locator(selector).click();
  const put=async(i,c)=>{await click(`[data-material="${c}"]`);await click(`[data-slot="${i}"]`);};
- await page.goto(base);await click('#start-btn');await click('#accept-order');await click('[data-source="rail-0"]');await click('[data-target="buffer-0"]');
+ await page.goto(base);await click('#start-btn');await click('#accept-order');await click('[data-source="palette-0"]');await click('[data-target="slot-0"]');
  const old=(await read()).state;await click('#go-home');
  await page.screenshot({path:`artifacts/design-home-${mobile?'mobile':'desktop'}.png`,fullPage:true});
  await click('#design-home-entry');await page.waitForFunction(()=>JSON.parse(render_game_to_text()).design);
